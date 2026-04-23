@@ -6,6 +6,7 @@ import http from "http";
 import https from "https";
 import path from "path";
 import { fileURLToPath } from "url";
+import os from "os";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,7 +55,7 @@ function callGemini(promptText) {
 }
 
 const PUBLIC_DIR = path.join(__dirname, "dist");
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = path.join(os.tmpdir(), "collabspace_data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
 const TEAMS_FILE = path.join(DATA_DIR, "teams.json");
@@ -194,6 +195,12 @@ function readRequestBody(req) {
 }
 
 async function readJsonBody(req) {
+  if (req.body) {
+    if (typeof req.body === 'string') {
+      try { return JSON.parse(req.body); } catch (e) { return {}; }
+    }
+    return req.body;
+  }
   const rawBody = await readRequestBody(req);
 
   if (!rawBody.trim()) {
@@ -1679,7 +1686,7 @@ async function handleUpdateProfile(req, res) {
 
 /* ── Request router ──────────────────────────────────── */
 
-const server = http.createServer(async (req, res) => {
+export default async function handler(req, res) {
   try {
     const requestUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     const { pathname } = requestUrl;
@@ -1840,9 +1847,4 @@ const server = http.createServer(async (req, res) => {
   } catch (error) {
     console.error(error);
     sendJson(res, 500, { error: "Internal server error." });
-  }
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`CollabSpace is running at http://${HOST}:${PORT}`);
-});
+}
