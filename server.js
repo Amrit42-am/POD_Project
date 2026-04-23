@@ -1,3 +1,4 @@
+import "dotenv/config";
 import crypto from "crypto";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { readFile, stat, writeFile } from "fs/promises";
@@ -18,7 +19,7 @@ const SESSION_SECRET =
 const TASK_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
 
 // GEMINI INTEGRATION
-const GEMINI_API_KEY = "AIzaSyAd5AkWhAjjKobWGC_l-_B5OypAvhRWsXA";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-1.5-pro";
 
 function callGemini(promptText) {
