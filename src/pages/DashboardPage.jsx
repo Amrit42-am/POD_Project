@@ -1,4 +1,25 @@
-let currentUser = null;
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { request, escapeHtml, formatFullDate, formatDate, normalizeTaskStatus, isArchivedTask, normalizeTask, initialsFor } from '../utils/api';
+
+export default function DashboardPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser, logout } = useAuth();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let localUser = currentUser;
+
+    // Use a custom mechanism for URL parameters inside the JS
+    const originalURLSearchParams = URLSearchParams;
+    window.URLSearchParams = function(query) {
+      return new originalURLSearchParams(location.search);
+    };
+
+    // We'll wrap all the logic from dashboard.js here
+    let currentUser = null;
 let teamData = null;
 let tasksData = [];
 let archivedTasksData = [];
@@ -550,7 +571,7 @@ async function bootstrap() {
       const homeBtn = document.createElement("button");
       homeBtn.className = "btn btn-secondary dashboard-home-btn";
       homeBtn.textContent = "Back to Home";
-      homeBtn.onclick = () => window.location.href = "/home.html";
+      homeBtn.onclick = () => navigate("/home.html");
       chip.parentNode.appendChild(homeBtn);
     }
     
@@ -558,7 +579,7 @@ async function bootstrap() {
     await Promise.all([loadTasks(), loadArchivedTasks(), loadMessages(), checkInvitations()]);
   } catch (err) {
     console.error("Not logged in!", err);
-    window.location.assign("/index.html");
+    navigate("/index.html");
   }
 }
 
@@ -1228,3 +1249,248 @@ if (logoutBtn) {
 setInterval(loadMessages, 5000);
 
 bootstrap();
+
+
+    // Add event listeners for navigation and modals
+    const handleNavigation = (e) => {
+      const el = e.currentTarget;
+      if (el.dataset.navigate) {
+        navigate(el.dataset.navigate.replace('.html', ''));
+      } else if (el.dataset.action === 'switchDashboardView') {
+        switchDashboardView(el.dataset.viewArgs);
+      }
+    };
+
+    // Handle global clicks
+    const handleGlobalClick = (e) => {
+      const target = e.target;
+      if (target.dataset.navigate) {
+        navigate(target.dataset.navigate.replace('.html', ''));
+      }
+    };
+    
+    document.addEventListener('click', handleGlobalClick);
+
+    // Call bootstrap
+    bootstrap();
+
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+      window.URLSearchParams = originalURLSearchParams; // restore
+      if (window.pollingInterval) clearInterval(window.pollingInterval);
+    };
+  }, [currentUser, navigate, location.search]);
+
+  return (
+    <>
+      
+
+  <div className="app-layout">
+    
+    
+    <aside className="app-sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-brand" data-navigate="/">
+          <div className="brand-mark">C</div>
+          CollabSpace
+        </div>
+        <div className="project-context-card" id="project-context-card">
+          <h3 className="project-context-title" id="context-team-name">Workspace</h3>
+          <p className="project-context-subtitle" id="context-team-meta">Connecting...</p>
+        </div>
+      </div>
+
+      <nav className="sidebar-nav">
+        <button className="sidebar-nav-item active" data-action="switchDashboardView" data-view-args="board">
+          <span>Dashboard</span>
+        </button>
+        <button className="sidebar-nav-item" data-action="switchDashboardView" data-view-args="archive">
+          <span>Archive</span>
+        </button>
+        <button className="sidebar-nav-item" data-action="switchDashboardView" data-view-args="contributions">
+          <span>Contributions</span>
+        </button>
+        <button className="sidebar-nav-item" data-action="switchDashboardView" data-view-args="chat">
+          <span>Chat</span>
+        </button>
+      </nav>
+
+      <div className="sidebar-footer">
+        <span id="nav-user-chip" className="project-context-subtitle" ></span>
+        <button id="nav-invites-btn" className="sidebar-nav-item" >Invites (0)</button>
+        <button data-navigate="/home.html" className="sidebar-nav-item">Back to Home</button>
+        <button id="nav-logout" className="sidebar-nav-item">Log Out</button>
+      </div>
+    </aside>
+
+    
+    <main className="app-main">
+      
+      
+      <section id="view-board" className="view-section active">
+        <div className="app-main-header">
+          <h1 className="app-main-title">Team Dashboard</h1>
+          <p className="app-main-subtitle" id="board-subtitle">Project Overview</p>
+        </div>
+        
+        <div className="board-header">
+          <h2 className="board-title">Task Board</h2>
+          <button className="btn btn-primary" id="add-task-btn">+ Add Task</button>
+        </div>
+        
+        <div className="kanban-board">
+          <div className="kanban-column"><h3 className="kanban-column-title title-todo">To Do</h3><div id="col-todo" className="task-list"></div></div>
+          <div className="kanban-column"><h3 className="kanban-column-title title-progress">In Progress</h3><div id="col-progress" className="task-list"></div></div>
+          <div className="kanban-column"><h3 className="kanban-column-title title-done">Done</h3><div id="col-done" className="task-list"></div></div>
+        </div>
+
+        <div className="dashboard-lower-grid">
+          <div className="dashboard-panel team-panel">
+            <h3 className="sidebar-title">Group Members</h3>
+            <div id="team-list" className="team-list"></div>
+            <div id="invite-panel" className="team-invite-panel" >
+              <h4 className="sidebar-title">Add Member</h4>
+              <form id="invite-form" className="inline-form">
+                <input className="settings-input" type="email" id="invite-email" placeholder="student@edu" required={true} />
+                <button type="submit" className="btn btn-secondary">Invite</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-archive" className="view-section">
+        <div className="app-main-header">
+          <h1 className="app-main-title">Completed Tasks Archive</h1>
+          <p className="app-main-subtitle">Tasks move here automatically 24 hours after completion. Archived tasks stay view-only, and only the project leader can delete them.</p>
+        </div>
+
+        <div className="dashboard-panel archive-panel">
+          <div className="archive-panel-header">
+            <div>
+              <h2 className="board-title">Archive</h2>
+              <p className="archive-panel-subtitle" id="archive-subtitle">Loading archived tasks...</p>
+            </div>
+          </div>
+          <div id="archive-list" className="archive-list"></div>
+        </div>
+      </section>
+
+      
+      <section id="view-contributions" className="view-section">
+        <div className="app-main-header">
+          <h1 className="app-main-title">Contribution Tracker</h1>
+          <p className="app-main-subtitle">See how each member is contributing to the project</p>
+        </div>
+        
+        <div id="analytics-content-v2" className="contribution-layout">
+          <section className="dashboard-panel contribution-panel contribution-breakdown-panel">
+            <div className="contribution-panel-head">
+              <h2 className="board-title">Contribution Breakdown</h2>
+              <p className="contribution-panel-copy">Live progress across the team, based on completed work.</p>
+            </div>
+            <div id="analytics-pie-chart" className="contribution-chart-shell"></div>
+            <div id="analytics-pie-legend" className="contribution-legend"></div>
+          </section>
+          <div id="analytics-bars" className="contribution-member-list"></div>
+        </div>
+      </section>
+
+      
+      <section id="view-chat" className="view-section">
+        <div className="app-main-header">
+          <h1 className="app-main-title">Team Chat</h1>
+          <p className="app-main-subtitle" id="chat-subtitle">Members</p>
+        </div>
+        
+        <div className="dashboard-panel" >
+          <div id="chat-container" className="chat-box" ></div>
+          <form id="chat-form" >
+            <div >
+              <span >📝</span>
+              <input type="text" id="chat-input" className="settings-input" placeholder="Type a message... (use @name to mention)" required={true}  />
+            </div>
+            <button type="submit" className="btn btn-primary" >Send</button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  
+  <dialog id="task-modal">
+    <div className="modal-shell">
+    <h3 id="task-modal-title" className="modal-title">New Task</h3>
+    <form id="task-form" className="modal-form">
+      <div className="modal-field">
+        <label>What needs doing?</label>
+        <input className="modal-input" type="text" id="task-title" required={true} />
+      </div>
+      <div className="modal-field">
+        <label>Details</label>
+        <textarea className="modal-textarea" id="task-desc" rows="3"></textarea>
+      </div>
+      <div className="modal-field">
+        <label>Assign To</label>
+        <select className="modal-select" id="task-assignee">
+          <option value="">✨ Auto-assign with AI</option>
+        </select>
+      </div>
+      <div className="modal-actions">
+        <button type="button" id="close-task-modal" className="btn btn-ghost">Cancel</button>
+        <button type="submit" id="task-submit-btn" className="btn btn-primary">Create Task</button>
+      </div>
+    </form>
+    </div>
+  </dialog>
+  
+  <dialog id="analytics-modal">
+    <div className="modal-shell">
+    <div className="modal-header">
+      <h3 className="modal-title">Squad Analytics</h3>
+      <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('analytics-modal').close()}>Close</button>
+    </div>
+    <div id="analytics-content">
+      
+      <div className="team-empty">Loading...</div>
+    </div>
+    </div>
+  </dialog>
+
+  
+  <dialog id="create-team-modal">
+    <div className="modal-shell">
+    <h3 className="modal-title">Start a new squad</h3>
+    <form id="create-team-form" className="modal-form">
+      <div className="modal-field">
+        <label>Team Name</label>
+        <input className="modal-input" type="text" id="new-team-name" required={true} />
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('create-team-modal').close()}>Cancel</button>
+        <button type="submit" className="btn btn-primary">Create</button>
+      </div>
+    </form>
+    </div>
+  </dialog>
+
+  
+  <dialog id="invites-modal">
+    <div className="modal-shell">
+    <div className="modal-header">
+      <h3 className="modal-title">Pending Invites</h3>
+      <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('invites-modal').close()}>Close</button>
+    </div>
+    <div id="invites-content" className="modal-form">
+      
+    </div>
+    </div>
+  </dialog>
+
+  
+
+
+    </>
+  );
+}

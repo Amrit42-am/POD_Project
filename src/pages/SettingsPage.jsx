@@ -1,4 +1,17 @@
-async function request(url, options = {}) {
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { request, escapeHtml } from '../utils/api';
+
+export default function SettingsPage() {
+  const navigate = useNavigate();
+  const { currentUser, logout, setCurrentUser } = useAuth();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let localUser = currentUser;
+
+    async function request(url, options = {}) {
   const response = await fetch(url, {
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -209,3 +222,101 @@ document.getElementById("settings-form").addEventListener("submit", async (event
 
 Object.keys(tagConfig).forEach(wireTagInput);
 bootstrap();
+
+    
+    // Listen for static nav
+    const handleStaticNav = (e) => {
+      const el = e.currentTarget;
+      if (el.dataset.navigate) {
+        navigate(el.dataset.navigate.replace('.html', ''));
+      }
+    };
+    
+    bootstrap();
+
+    return () => {
+    };
+  }, [currentUser, navigate, logout, setCurrentUser]);
+
+  return (
+    <>
+      
+
+  <div className="app-layout">
+    
+    
+    <aside className="app-sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-brand" data-navigate="/">
+          <div className="brand-mark">C</div>
+          CollabSpace
+        </div>
+      </div>
+      
+      <nav className="sidebar-nav">
+        
+        <button className="sidebar-nav-item active">
+          <span>Edit Profile</span>
+        </button>
+      </nav>
+      
+      <div className="sidebar-footer">
+        <button data-navigate="/home.html" className="sidebar-nav-item">Return to Dashboard</button>
+      </div>
+    </aside>
+
+    <main className="app-main">
+      <div className="app-main-header">
+        <h1 className="app-main-title">Edit Profile</h1>
+        <p className="app-main-subtitle">Manage your identity, interests, and the kind of work you usually take on.</p>
+      </div>
+      
+      <section className="dashboard-panel settings-profile-card">
+        <form id="settings-form" className="settings-profile-form">
+          <div className="settings-field">
+            <label htmlFor="name">Your Name</label>
+            <input className="settings-input" type="text" id="name" required={true} />
+          </div>
+
+          <div className="settings-field">
+            <label htmlFor="course">Course / Major</label>
+            <input className="settings-input" type="text" id="course" placeholder="e.g. CS 101" />
+          </div>
+
+          <div className="settings-field">
+            <label htmlFor="about">About You</label>
+            <textarea className="settings-input settings-textarea" id="about" rows="4" placeholder="Share what you enjoy building, how you like to collaborate, and what makes you effective on a team."></textarea>
+          </div>
+
+          <div className="settings-field">
+            <label htmlFor="skills-input">Skills & Interests</label>
+            <div className="tag-editor" id="skills-editor">
+              <div id="skills-tags" className="tag-editor-list"></div>
+              <input className="tag-editor-input" type="text" id="skills-input" placeholder="Type a skill and press Enter" />
+            </div>
+            <p className="settings-helper">Add the things you're good at or enjoy working with.</p>
+          </div>
+
+          <div className="settings-field">
+            <label htmlFor="work-focus-input">What I Usually Work On</label>
+            <div className="tag-editor" id="work-focus-editor">
+              <div id="work-focus-tags" className="tag-editor-list"></div>
+              <input className="tag-editor-input" type="text" id="work-focus-input" placeholder="Frontend, backend, design, research..." />
+            </div>
+            <p className="settings-helper">Press Enter or comma to add each area.</p>
+          </div>
+
+          <div className="settings-actions">
+            <button type="submit" className="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  
+
+
+    </>
+  );
+}

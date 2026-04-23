@@ -52,7 +52,7 @@ function callGemini(promptText) {
   });
 }
 
-const PUBLIC_DIR = path.join(__dirname, "public");
+const PUBLIC_DIR = path.join(__dirname, "dist");
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
@@ -1814,26 +1814,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Dashboard (protected)
-    if (req.method === "GET" && pathname === "/dashboard") {
-      const user = await getAuthenticatedUser(req);
-
-      if (!user) {
-        redirect(res, "/?auth=login");
-        return;
-      }
-
-      await sendFile(res, path.join(PUBLIC_DIR, "dashboard.html"));
-      return;
-    }
-
-    // Settings page (protected)
-    if (req.method === "GET" && pathname === "/settings") {
-      const user = await getAuthenticatedUser(req);
-      if (!user) { redirect(res, "/?auth=login"); return; }
-      await sendFile(res, path.join(PUBLIC_DIR, "settings.html"));
-      return;
-    }
+    // Dashboard and Settings pages are now handled by the React SPA router
 
     if (req.method === "GET" && pathname === "/favicon.ico") {
       res.writeHead(204);
@@ -1854,7 +1835,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    sendText(res, 404, "Not found");
+    await sendFile(res, path.join(PUBLIC_DIR, "index.html"));
   } catch (error) {
     console.error(error);
     sendJson(res, 500, { error: "Internal server error." });

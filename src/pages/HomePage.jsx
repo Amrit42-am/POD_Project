@@ -1,4 +1,19 @@
-async function request(url, options = {}) {
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { request, escapeHtml, formatRelativeTime, initialsFor } from '../utils/api';
+
+export default function HomePage() {
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let localUser = currentUser;
+
+    // We'll wrap all the logic from home.js here
+    async function request(url, options = {}) {
   const response = await fetch(url, {
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -249,7 +264,7 @@ function renderProjectInvolvement(projects) {
   }
 
   container.innerHTML = projects.map((project) => `
-    <div class="profile-project-item" onclick="window.location.href='/dashboard.html?teamId=${encodeURIComponent(project.id)}'">
+    <div class="profile-project-item" onclick="navigate("/dashboard.html?teamId=${encodeURIComponent(project.id)}")">
       <div class="profile-project-copy">
         <strong class="profile-project-title">${escapeHtml(project.projectTitle || project.name || "Untitled Project")}</strong>
         <span class="profile-project-meta">${escapeHtml(project.name || "Workspace")} • ${escapeHtml(project.memberCount)} members</span>
@@ -411,7 +426,7 @@ function renderActivity(projects, tasks, user) {
 
 function generateCard(team, isLeader) {
   return `
-    <div class="project-card ${isLeader ? "p-leader" : ""}" onclick="window.location.href='/dashboard.html?teamId=${encodeURIComponent(team.id)}'">
+    <div class="project-card ${isLeader ? "p-leader" : ""}" data-team-id="${escapeHtml(team.id)}">
       <h4 class="p-title">${escapeHtml(team.projectTitle || "Untitled Project")}</h4>
       <div class="p-desc">Team: ${escapeHtml(team.name || "Workspace")} &bull; ${escapeHtml(team.memberCount)} members</div>
       <div class="p-footer">
@@ -471,7 +486,7 @@ async function bootstrap() {
     await loadProjects();
   } catch (err) {
     console.error(err);
-    window.location.href = "/index.html";
+    navigate("/index.html");
   }
 }
 
@@ -541,7 +556,7 @@ async function logout() {
   } catch (error) {
     console.error("Logout failed", error);
   }
-  window.location.href = "/index.html";
+  navigate("/index.html");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -571,6 +586,208 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-window.switchView = switchView;
-window.logout = logout;
-window.onload = bootstrap;
+
+
+
+
+    
+    // Add event listeners for the inline onclicks that we stripped or need to handle
+    const handleNavigation = (e) => {
+      const el = e.currentTarget;
+      if (el.dataset.navigate) {
+        navigate(el.dataset.navigate.replace('.html', ''));
+      } else if (el.dataset.action === 'switchView') {
+        switchView(el.dataset.viewArgs);
+      } else if (el.dataset.action === 'logout') {
+        logout().then(() => navigate('/'));
+      }
+    };
+
+    // Use event delegation for dynamic elements
+    const handleDynamicClick = (e) => {
+      const card = e.target.closest('.project-card');
+      if (card && card.dataset.teamId) {
+        navigate('/dashboard?teamId=' + encodeURIComponent(card.dataset.teamId));
+      }
+    };
+    
+    document.addEventListener('click', handleDynamicClick);
+
+    // Call bootstrap
+    bootstrap();
+
+    return () => {
+      document.removeEventListener('click', handleDynamicClick);
+    };
+  }, [currentUser, navigate, logout]);
+
+  // Provide a clean way to handle clicks that were previously inline onclicks
+  const handleStaticClick = (e) => {
+     const action = e.currentTarget.dataset.action;
+     if (action === 'navigate') {
+       navigate(e.currentTarget.dataset.href.replace('.html', ''));
+     }
+  };
+
+  return (
+    <>
+      
+
+
+  <div className="app-layout">
+    
+    
+    <aside className="app-sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-brand" data-navigate="/">
+          <div className="brand-mark">C</div>
+          CollabSpace
+        </div>
+      </div>
+      
+      <nav className="sidebar-nav">
+        <button id="nav-btn-projects" className="sidebar-nav-item active" data-action="switchView" data-view-args="projects">
+          <span>Workspace Hub</span>
+        </button>
+        <button id="nav-btn-profile" className="sidebar-nav-item" data-action="switchView" data-view-args="profile">
+          <span>Profile</span>
+        </button>
+      </nav>
+      
+      <div className="sidebar-footer">
+        <span id="user-greeting" className="project-context-subtitle" >Loading...</span>
+        <button data-navigate="/settings.html" className="sidebar-nav-item">Edit Profile</button>
+        <button data-action="logout" className="sidebar-nav-item">Sign Out</button>
+      </div>
+    </aside>
+
+    <main className="app-main">
+      
+      
+      <section id="view-profile" className="view-section">
+        <div className="app-main-header">
+          <h1 className="app-main-title">Profile Portal</h1>
+          <p className="app-main-subtitle">See your strengths, current projects, and the work you’ve been driving lately.</p>
+        </div>
+        <div className="profile-card">
+          <div className="profile-header">
+            <div id="p-avatar" className="avatar-circle">?</div>
+            <div className="profile-header-copy">
+              <h2 id="p-name" className="profile-name">User Name</h2>
+              <div className="profile-meta-row">
+                <div id="p-role" className="profile-role-badge">Member</div>
+                <div id="p-course" className="profile-meta-chip">Course not added yet</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-stats-grid" id="p-stats">
+            <div className="profile-stat-card">
+              <span className="profile-stat-value">0</span>
+              <span className="profile-stat-label">Projects</span>
+            </div>
+            <div className="profile-stat-card">
+              <span className="profile-stat-value">0</span>
+              <span className="profile-stat-label">Tasks Completed</span>
+            </div>
+            <div className="profile-stat-card">
+              <span className="profile-stat-value">0</span>
+              <span className="profile-stat-label">Contributions</span>
+            </div>
+          </div>
+
+          <div className="profile-block">
+            <div className="profile-section-title">About You</div>
+            <p id="p-about" className="bio-text">Passionate about building projects and collaborating with teams to deliver excellent digital experiences.</p>
+          </div>
+
+          <div className="profile-insights-grid">
+            <div className="profile-block">
+              <div className="profile-section-title">Skills & Interests</div>
+              <div id="p-skills" className="skills-list"></div>
+            </div>
+
+            <div className="profile-block">
+              <div className="profile-section-title">What I Usually Work On</div>
+              <div id="p-work-focus" className="skills-list"></div>
+            </div>
+          </div>
+
+          <div className="profile-block">
+            <div className="profile-section-title">Projects Involved</div>
+            <div id="p-projects" className="profile-projects-list">
+              <div className="team-empty">No active projects yet.</div>
+            </div>
+          </div>
+
+          <div className="profile-block">
+            <div className="profile-section-title">Project Contributions</div>
+            <div id="p-contributions" className="profile-contributions-list">
+              <div className="team-empty">Contribution details will appear once you join a project.</div>
+            </div>
+          </div>
+
+          <div className="profile-block">
+            <div className="profile-section-title">Recent Activity</div>
+            <div className="activity-container" id="p-activity">
+              <div className="activity-item">
+                <div className="activity-marker"></div>
+                <div className="activity-copy">
+                  <div className="activity-time">2h ago</div>
+                  <div className="activity-desc">Updated profile settings</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      
+      <section id="view-projects" className="view-section active">
+        <div className="app-main-header" >
+          <div>
+            <h1 className="app-main-title">Workspace Hub</h1>
+            <p className="app-main-subtitle">Jump back into your projects or initialize a new enterprise initiative.</p>
+          </div>
+          <button onClick={() => document.getElementById('create-project-modal').showModal()} className="btn btn-primary">+ New Workspace</button>
+        </div>
+
+        <h3 className="project-group-title">🔥 Projects You Lead</h3>
+        <div id="leader-grid" className="project-grid"></div>
+
+        <h3 className="project-group-title">🤝 Projects You've Joined</h3>
+        <div id="member-grid" className="project-grid"></div>
+      </section>
+
+    </main>
+  </div>
+
+  
+  <dialog id="create-project-modal">
+    <div className="modal-shell">
+    <h2 className="modal-title">Create Workspace</h2>
+    <p className="modal-subtitle">Initialize a new project environment for your team to collaborate.</p>
+    
+    <form id="create-project-form" className="modal-form">
+      <div className="modal-field">
+        <label htmlFor="cp-name">WORKSPACE NAME</label>
+        <input className="modal-input" type="text" id="cp-name" required={true} placeholder="e.g. Acme Integration" />
+      </div>
+      <div className="modal-field">
+        <label htmlFor="cp-title">INTERNAL ALIAS (OPTIONAL)</label>
+        <input className="modal-input" type="text" id="cp-title" placeholder="e.g. Project Phoenix" />
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="btn btn-secondary" onClick={() => document.getElementById('create-project-modal').close()}>Cancel</button>
+        <button type="submit" className="btn btn-primary">Initialize</button>
+      </div>
+    </form>
+    </div>
+  </dialog>
+
+  
+
+
+    </>
+  );
+}
