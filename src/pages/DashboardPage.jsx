@@ -6,11 +6,11 @@ import { request, escapeHtml, formatFullDate, formatDate, normalizeTaskStatus, i
 export default function DashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout } = useAuth();
+  const { currentUser: authCurrentUser, logout } = useAuth();
 
   useEffect(() => {
-    if (!currentUser) return;
-    let localUser = currentUser;
+    if (!authCurrentUser) return;
+    let currentUser = authCurrentUser;
 
     // Use a custom mechanism for URL parameters inside the JS
     const originalURLSearchParams = URLSearchParams;
@@ -19,7 +19,6 @@ export default function DashboardPage() {
     };
 
     // We'll wrap all the logic from dashboard.js here
-    let currentUser = null;
 let teamData = null;
 let tasksData = [];
 let archivedTasksData = [];
@@ -560,19 +559,12 @@ function loadAnalyticsV2() {
 
 async function bootstrap() {
   try {
-    const payload = await request("/api/auth/me", { method: "GET" });
-    currentUser = payload.user;
     renderContributionTracker();
     
-    // Add "Back to Home" button
+    // Add user chip content
     const chip = document.getElementById("nav-user-chip");
     if(chip) {
       chip.textContent = `Hey, ${currentUser.name.split(' ')[0]}!`;
-      const homeBtn = document.createElement("button");
-      homeBtn.className = "btn btn-secondary dashboard-home-btn";
-      homeBtn.textContent = "Back to Home";
-      homeBtn.onclick = () => navigate("/home.html");
-      chip.parentNode.appendChild(homeBtn);
     }
     
     await loadTeam();
@@ -1263,9 +1255,12 @@ bootstrap();
 
     // Handle global clicks
     const handleGlobalClick = (e) => {
-      const target = e.target;
+      const target = e.target.closest('[data-navigate], [data-action]');
+      if (!target) return;
       if (target.dataset.navigate) {
         navigate(target.dataset.navigate.replace('.html', ''));
+      } else if (target.dataset.action === 'switchDashboardView') {
+        switchDashboardView(target.dataset.viewArgs);
       }
     };
     
@@ -1279,10 +1274,10 @@ bootstrap();
       window.URLSearchParams = originalURLSearchParams; // restore
       if (window.pollingInterval) clearInterval(window.pollingInterval);
     };
-  }, [currentUser, navigate, location.search]);
+  }, [authCurrentUser, navigate, location.search]);
 
   return (
-    <>
+    <div className="dashboard-body">
       
 
   <div className="app-layout">
@@ -1490,7 +1485,6 @@ bootstrap();
 
   
 
-
-    </>
+    </div>
   );
 }

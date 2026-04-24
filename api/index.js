@@ -1,12 +1,11 @@
 import "dotenv/config";
 import crypto from "crypto";
-import { mkdirSync, existsSync, writeFileSync } from "fs";
-import { readFile, stat, writeFile } from "fs/promises";
+import { readFile, stat } from "fs/promises";
 import http from "http";
 import https from "https";
 import path from "path";
 import { fileURLToPath } from "url";
-import os from "os";
+import { MongoClient } from "mongodb";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,11 +54,6 @@ function callGemini(promptText) {
 }
 
 const PUBLIC_DIR = path.join(__dirname, "dist");
-const DATA_DIR = path.join(os.tmpdir(), "collabspace_data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
-const TEAMS_FILE = path.join(DATA_DIR, "teams.json");
-const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -72,24 +66,32 @@ const MIME_TYPES = {
   ".webp": "image/webp"
 };
 
-ensureDataStore();
+/* ── MongoDB Connection ──────────────────────────────── */
 
-function ensureDataStore() {
-  mkdirSync(DATA_DIR, { recursive: true });
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error("FATAL: MONGODB_URI environment variable is not set.");
+  process.exit(1);
+}
 
-  if (!existsSync(USERS_FILE)) {
-    writeFileSync(USERS_FILE, "[]\n");
-  }
-  if (!existsSync(TASKS_FILE)) {
-    writeFileSync(TASKS_FILE, "[]\n");
-  }
-  if (!existsSync(TEAMS_FILE)) {
-    writeFileSync(TEAMS_FILE, "[]\n");
-  }
-  if (!existsSync(MESSAGES_FILE)) {
-    writeFileSync(MESSAGES_FILE, "[]\n");
+const mongoClient = new MongoClient(MONGODB_URI);
+let db;
+
+async function connectToDatabase() {
+  if (db) return db;
+  try {
+    await mongoClient.connect();
+    db = mongoClient.db("collabspace");
+    console.log("✅ Connected to MongoDB Atlas (collabspace)");
+    return db;
+  } catch (error) {
+    console.error("Failed to connect to MongoDB:", error);
+    process.exit(1);
   }
 }
+
+// Connect on startup
+connectToDatabase();
 
 /* ── Helpers ─────────────────────────────────────────── */
 
@@ -210,62 +212,67 @@ async function readJsonBody(req) {
   return JSON.parse(rawBody);
 }
 
-/* ── JSON file helpers ───────────────────────────────── */
-
-async function readJsonFile(filePath) {
-  try {
-    const raw = await readFile(filePath, "utf8");
-    const data = JSON.parse(raw || "[]");
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
-}
-
-async function writeJsonFile(filePath, data) {
-  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-}
+/* ── MongoDB Collection Helpers ──────────────────────── */
 
 async function readUsers() {
-  return readJsonFile(USERS_FILE);
+  const database = await connectToDatabase();
+  const docs = await database.collection("users").find({}).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
 }
 
 async function writeUsers(users) {
-  await writeJsonFile(USERS_FILE, users);
+  const database = await connectToDatabase();
+  const col = database.collection("users");
+  await col.deleteMany({});
+  if (users.length > 0) {
+    await col.insertMany(users);
+  }
 }
 
 async function readTasks() {
-  const rawTasks = await readJsonFile(TASKS_FILE);
-  const normalizedTasks = rawTasks.map((task) => normalizeStoredTask(task));
-
-  if (JSON.stringify(rawTasks) !== JSON.stringify(normalizedTasks)) {
-    await writeJsonFile(TASKS_FILE, normalizedTasks);
-  }
-
-  return normalizedTasks;
+  const database = await connectToDatabase();
+  const rawTasks = await database.collection("tasks").find({}).toArray();
+  const cleaned = rawTasks.map(({ _id, ...rest }) => rest);
+  return cleaned.map((task) => normalizeStoredTask(task));
 }
 
 async function writeTasks(tasks) {
-  await writeJsonFile(TASKS_FILE, tasks);
+  const database = await connectToDatabase();
+  const col = database.collection("tasks");
+  await col.deleteMany({});
+  if (tasks.length > 0) {
+    await col.insertMany(tasks);
+  }
 }
 
 async function readTeams() {
-  return readJsonFile(TEAMS_FILE);
+  const database = await connectToDatabase();
+  const docs = await database.collection("teams").find({}).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
 }
 
 async function writeTeams(teams) {
-  await writeJsonFile(TEAMS_FILE, teams);
+  const database = await connectToDatabase();
+  const col = database.collection("teams");
+  await col.deleteMany({});
+  if (teams.length > 0) {
+    await col.insertMany(teams);
+  }
 }
 
 async function readMessages() {
-  return readJsonFile(MESSAGES_FILE);
+  const database = await connectToDatabase();
+  const docs = await database.collection("messages").find({}).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
 }
 
 async function writeMessages(messages) {
-  await writeJsonFile(MESSAGES_FILE, messages);
+  const database = await connectToDatabase();
+  const col = database.collection("messages");
+  await col.deleteMany({});
+  if (messages.length > 0) {
+    await col.insertMany(messages);
+  }
 }
 
 /* ── Auth helpers ────────────────────────────────────── */
@@ -1847,4 +1854,5 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error(error);
     sendJson(res, 500, { error: "Internal server error." });
+  }
 }

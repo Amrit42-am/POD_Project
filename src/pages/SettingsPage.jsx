@@ -5,11 +5,11 @@ import { request, escapeHtml } from '../utils/api';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { currentUser, logout, setCurrentUser } = useAuth();
+  const { currentUser: authCurrentUser, logout, setCurrentUser } = useAuth();
 
   useEffect(() => {
-    if (!currentUser) return;
-    let localUser = currentUser;
+    if (!authCurrentUser) return;
+    let currentUser = authCurrentUser;
 
     async function request(url, options = {}) {
   const response = await fetch(url, {
@@ -23,7 +23,6 @@ export default function SettingsPage() {
   return payload;
 }
 
-let currentUser = null;
 const tagState = {
   skills: [],
   workFocus: []
@@ -171,8 +170,6 @@ function wireTagInput(key) {
 
 async function bootstrap() {
   try {
-    const payload = await request("/api/auth/me", { method: "GET" });
-    currentUser = payload.user;
 
     document.getElementById("name").value = currentUser.name || "";
     document.getElementById("course").value = currentUser.course || "";
@@ -236,7 +233,7 @@ bootstrap();
 
     return () => {
     };
-  }, [currentUser, navigate, logout, setCurrentUser]);
+  }, [authCurrentUser, navigate, logout, setCurrentUser]);
 
   return (
     <>

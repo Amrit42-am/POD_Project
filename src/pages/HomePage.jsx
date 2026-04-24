@@ -5,12 +5,12 @@ import { request, escapeHtml, formatRelativeTime, initialsFor } from '../utils/a
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth();
+  const { currentUser: authCurrentUser, logout } = useAuth();
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!authCurrentUser) return;
 
-    let localUser = currentUser;
+    let currentUser = authCurrentUser;
 
     // We'll wrap all the logic from home.js here
     async function request(url, options = {}) {
@@ -24,8 +24,6 @@ export default function HomePage() {
   if (!response.ok) throw new Error(payload.error || "Request failed.");
   return payload;
 }
-
-let currentUser = null;
 
 function escapeHtml(value) {
   return String(value || "")
@@ -475,8 +473,6 @@ async function loadAllTasksForProjects(projects) {
 
 async function bootstrap() {
   try {
-    const payload = await request("/api/auth/me", { method: "GET" });
-    currentUser = payload.user || payload;
 
     const urlParams = new URLSearchParams(window.location.search);
     const requestedView = urlParams.get("view");
@@ -559,10 +555,12 @@ async function logout() {
   navigate("/index.html");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("create-project-form");
   if (form) {
-    form.addEventListener("submit", async (event) => {
+    // Ensure we don't attach multiple listeners if useEffect runs multiple times
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    newForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const name = document.getElementById("cp-name").value.trim();
       const projectTitle = document.getElementById("cp-title").value.trim();
@@ -584,42 +582,37 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-});
 
 
 
 
 
     
-    // Add event listeners for the inline onclicks that we stripped or need to handle
-    const handleNavigation = (e) => {
-      const el = e.currentTarget;
-      if (el.dataset.navigate) {
-        navigate(el.dataset.navigate.replace('.html', ''));
-      } else if (el.dataset.action === 'switchView') {
-        switchView(el.dataset.viewArgs);
-      } else if (el.dataset.action === 'logout') {
+    // Unified global click handler
+    const handleGlobalClick = (e) => {
+      const target = e.target.closest('[data-navigate], [data-action], .project-card');
+      if (!target) return;
+
+      if (target.classList.contains('project-card') && target.dataset.teamId) {
+        navigate('/dashboard?teamId=' + encodeURIComponent(target.dataset.teamId));
+      } else if (target.dataset.navigate) {
+        navigate(target.dataset.navigate.replace('.html', ''));
+      } else if (target.dataset.action === 'switchView') {
+        switchView(target.dataset.viewArgs);
+      } else if (target.dataset.action === 'logout') {
         logout().then(() => navigate('/'));
       }
     };
-
-    // Use event delegation for dynamic elements
-    const handleDynamicClick = (e) => {
-      const card = e.target.closest('.project-card');
-      if (card && card.dataset.teamId) {
-        navigate('/dashboard?teamId=' + encodeURIComponent(card.dataset.teamId));
-      }
-    };
     
-    document.addEventListener('click', handleDynamicClick);
+    document.addEventListener('click', handleGlobalClick);
 
     // Call bootstrap
     bootstrap();
 
     return () => {
-      document.removeEventListener('click', handleDynamicClick);
+      document.removeEventListener('click', handleGlobalClick);
     };
-  }, [currentUser, navigate, logout]);
+  }, [authCurrentUser, navigate, logout]);
 
   // Provide a clean way to handle clicks that were previously inline onclicks
   const handleStaticClick = (e) => {
