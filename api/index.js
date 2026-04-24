@@ -53,7 +53,7 @@ function callGemini(promptText) {
   });
 }
 
-const PUBLIC_DIR = path.join(__dirname, "dist");
+const PUBLIC_DIR = path.join(__dirname, "..", "dist");
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
