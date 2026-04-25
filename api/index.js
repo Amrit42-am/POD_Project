@@ -275,6 +275,11 @@ async function writeMessages(messages) {
   }
 }
 
+async function appendMessage(message) {
+  const database = await connectToDatabase();
+  await database.collection("messages").insertOne(message);
+}
+
 /* ── Auth helpers ────────────────────────────────────── */
 
 function normalizeEmail(email) {
@@ -1574,7 +1579,6 @@ async function handlePostMessage(req, res) {
     const team = findUserTeam(teams, user.id, teamId);
     if (!team) { sendJson(res, 403, { error: "Access denied." }); return; }
 
-    const messages = await readMessages();
     const message = {
       id: crypto.randomUUID(),
       text,
@@ -1585,8 +1589,7 @@ async function handlePostMessage(req, res) {
       createdAt: new Date().toISOString()
     };
 
-    messages.push(message);
-    await writeMessages(messages);
+    await appendMessage(message);
     sendJson(res, 201, { message });
   } catch {
     sendJson(res, 400, { error: "Could not send message." });
