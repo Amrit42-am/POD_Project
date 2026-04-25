@@ -1859,3 +1859,42 @@ export default async function handler(req, res) {
     sendJson(res, 500, { error: "Internal server error." });
   }
 }
+
+/* ── Periodic Role Recalculation ─────────────────────── */
+
+async function recalculateAllRoles() {
+  try {
+    const teams = await readTeams();
+    const users = await readUsers();
+    let updated = false;
+
+    for (const team of teams) {
+      if (!Array.isArray(team.members) || team.members.length < 2) continue;
+
+      try {
+        const suggestions = await suggestRolesForTeam(team.members, users, team.createdBy);
+        
+        for (const assignment of suggestions) {
+          const member = team.members.find((m) => m.userId === assignment.userId);
+          if (member) member.role = assignment.role;
+
+          const uIndex = users.findIndex((u) => u.id === assignment.userId);
+          if (uIndex !== -1) users[uIndex].role = assignment.role;
+        }
+        updated = true;
+        console.log(`✅ Roles recalculated for team: ${team.name}`);
+      } catch (err) {
+        console.error(`❌ Role recalculation failed for team ${team.name}:`, err.message);
+      }
+    }
+
+    if (updated) {
+      await writeTeams(teams);
+      await writeUsers(users);
+    }
+  } catch (err) {
+    console.error("Periodic role recalculation error:", err);
+  }
+}
+
+export { recalculateAllRoles };
