@@ -1689,6 +1689,11 @@ async function handleUpdateProfile(req, res) {
 
     await writeUsers(users);
     sendJson(res, 200, { user: publicUser(users[userIndex]) });
+
+    // Trigger role recalculation in the background (non-blocking)
+    recalculateAllRoles().catch((err) =>
+      console.error("Background role recalc after profile update failed:", err)
+    );
   } catch {
     sendJson(res, 400, { error: "Could not update profile." });
   }
@@ -1871,6 +1876,21 @@ async function recalculateAllRoles() {
     for (const team of teams) {
       if (!Array.isArray(team.members) || team.members.length < 2) continue;
 
+      // Check if any member's profile was updated since last role check
+      const lastChecked = team._rolesCheckedAt || "1970-01-01T00:00:00.000Z";
+      const memberIds = team.members.map((m) => m.userId);
+      const teamUsers = users.filter((u) => memberIds.includes(u.id));
+
+      const hasProfileChanges = teamUsers.some((u) => {
+        const profileUpdated = u.profileUpdatedAt || "1970-01-01T00:00:00.000Z";
+        return profileUpdated > lastChecked;
+      });
+
+      if (!hasProfileChanges) {
+        console.log(`⏭️  Skipping team "${team.name}" — no profile changes since last check.`);
+        continue;
+      }
+
       try {
         const suggestions = await suggestRolesForTeam(team.members, users, team.createdBy);
         
@@ -1881,6 +1901,7 @@ async function recalculateAllRoles() {
           const uIndex = users.findIndex((u) => u.id === assignment.userId);
           if (uIndex !== -1) users[uIndex].role = assignment.role;
         }
+        team._rolesCheckedAt = new Date().toISOString();
         updated = true;
         console.log(`✅ Roles recalculated for team: ${team.name}`);
       } catch (err) {
