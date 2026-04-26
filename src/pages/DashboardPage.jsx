@@ -1169,7 +1169,7 @@ async function loadMessages() {
     messagesData = payload.messages || [];
     renderMessages();
   } catch(e) {
-    console.error("Failed to load messages");
+    console.error("Failed to load messages", e);
   }
 }
 
@@ -1183,12 +1183,12 @@ function renderMessages() {
   }
   
   container.innerHTML = messagesData.map(msg => `
-    <div class="chat-message ${msg.email === currentUser.email ? 'is-me' : ''}">
+    <div class="chat-message ${msg.userId === currentUser.id ? 'is-me' : ''}">
       <div class="chat-message-head">
-        <strong>${msg.name}</strong>
-        <span class="chat-message-time">${formatDate(msg.timestamp)}</span>
+        <strong>${escapeHtml(msg.userName || msg.name || 'Unknown')}</strong>
+        <span class="chat-message-time">${formatDate(msg.createdAt || msg.timestamp)}</span>
       </div>
-      <div>${msg.content}</div>
+      <div>${escapeHtml(msg.text || msg.content || '')}</div>
     </div>
   `).join('');
   
@@ -1208,20 +1208,19 @@ if(chatForm) {
     // Optimistic update
     messagesData.push({
       id: Date.now().toString(),
-      name: currentUser.name,
-      email: currentUser.email,
-      content: val,
-      timestamp: new Date().toISOString()
+      userName: currentUser.name,
+      userId: currentUser.id,
+      text: val,
+      createdAt: new Date().toISOString()
     });
     renderMessages();
     
-    // Async request
+    // Send to backend
     try {
       await request("/api/messages", {
         method: "POST",
-        body: JSON.stringify({ content: val })
+        body: JSON.stringify({ text: val })
       });
-      // Optionally reload to ensure sync
       loadMessages();
     } catch(err) {
       console.error("Failed to send message", err);
