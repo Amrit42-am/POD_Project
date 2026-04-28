@@ -212,9 +212,21 @@ function renderStaticProfile(user) {
   renderTagBadges("p-work-focus", deriveFocusAreas(safeUser), "Add your focus areas in settings");
 }
 
+function isTaskAssignedToUser(task, user) {
+  if (!task || !user) {
+    return false;
+  }
+
+  if (Array.isArray(task.assignees) && task.assignees.some((assignee) => assignee?.id === user.id)) {
+    return true;
+  }
+
+  return task.assigneeId === user.id || task.assignee === user.name;
+}
+
 function buildProjectStats(projects, tasks) {
   const completedTasks = tasks.filter((task) => {
-    const isAssignee = task.assigneeId === currentUser.id || task.assignee === currentUser.name;
+    const isAssignee = isTaskAssignedToUser(task, currentUser);
     return isAssignee && (normalizeTaskStatus(task.status) === "Done" || String(task.archivedAt || "").trim());
   }).length;
 
@@ -222,7 +234,7 @@ function buildProjectStats(projects, tasks) {
     tasks
       .filter((task) => {
         const isCreator = task.createdBy === currentUser.id;
-        const isAssignee = task.assigneeId === currentUser.id || task.assignee === currentUser.name;
+        const isAssignee = isTaskAssignedToUser(task, currentUser);
         return isCreator || isAssignee;
       })
       .map((task) => task.id)
@@ -262,7 +274,7 @@ function renderProjectInvolvement(projects) {
   }
 
   container.innerHTML = projects.map((project) => `
-    <div class="profile-project-item" onclick="navigate("/dashboard.html?teamId=${encodeURIComponent(project.id)}")">
+    <div class="profile-project-item" data-team-id="${escapeHtml(project.id)}">
       <div class="profile-project-copy">
         <strong class="profile-project-title">${escapeHtml(project.projectTitle || project.name || "Untitled Project")}</strong>
         <span class="profile-project-meta">${escapeHtml(project.name || "Workspace")} • ${escapeHtml(project.memberCount)} members</span>
@@ -281,7 +293,7 @@ function taskBelongsToProject(task, project) {
 }
 
 function isUserTask(task) {
-  return task.assigneeId === currentUser.id || task.assignee === currentUser.name;
+  return isTaskAssignedToUser(task, currentUser);
 }
 
 function isCompletedTask(task) {
@@ -369,7 +381,7 @@ function buildActivityEvents(projects, tasks, user) {
   tasks.forEach((task) => {
     const taskKey = String(task.id || "");
     const isCreator = task.createdBy === user.id;
-    const isAssignee = task.assigneeId === user.id || task.assignee === user.name;
+    const isAssignee = isTaskAssignedToUser(task, user);
 
     if (isAssignee && task.completedAt && !taskEventIds.has(`${taskKey}:completed`)) {
       taskEventIds.add(`${taskKey}:completed`);
@@ -503,11 +515,11 @@ async function checkInvitations() {
       
       container.innerHTML = invites.map(i => `
         <div class="invite-card">
-          <div class="invite-title">${i.teamName}</div>
-          <div class="invite-subtitle">Invited by ${i.invitedByName}</div>
+          <div class="invite-title">${escapeHtml(i.teamName)}</div>
+          <div class="invite-subtitle">Invited by ${escapeHtml(i.invitedByName)}</div>
           <div class="invite-actions">
-            <button class="btn btn-primary" onclick="acceptInvite('${i.teamId}')">Accept</button>
-            <button class="btn btn-ghost" onclick="rejectInvite('${i.teamId}')">Reject</button>
+            <button class="btn btn-primary" data-invite-action="accept" data-team-id="${escapeHtml(i.teamId)}">Accept</button>
+            <button class="btn btn-ghost" data-invite-action="reject" data-team-id="${escapeHtml(i.teamId)}">Reject</button>
           </div>
         </div>
       `).join('');
@@ -518,19 +530,19 @@ async function checkInvitations() {
   } catch(e) { }
 }
 
-window.acceptInvite = async (teamId) => {
+async function acceptInvite(teamId) {
   try {
     await request("/api/team/invitations/accept", { method: "POST", body: JSON.stringify({ teamId }) });
     window.location.reload();
   } catch(e) { alert("Failed to accept"); }
-};
+}
 
-window.rejectInvite = async (teamId) => {
+async function rejectInvite(teamId) {
   try {
     await request("/api/team/invitations/reject", { method: "POST", body: JSON.stringify({ teamId }) });
     checkInvitations();
   } catch(e) { alert("Failed to reject"); }
-};
+}
 
 async function loadProjects() {
   try {
@@ -635,12 +647,18 @@ async function logout() {
 
     
     // Unified global click handler
-    const handleGlobalClick = (e) => {
-      const target = e.target.closest('[data-navigate], [data-action], .project-card');
+    const handleGlobalClick = async (e) => {
+      const target = e.target.closest('[data-navigate], [data-action], [data-invite-action], .project-card, .profile-project-item');
       if (!target) return;
 
-      if (target.classList.contains('project-card') && target.dataset.teamId) {
+      if ((target.classList.contains('project-card') || target.classList.contains('profile-project-item')) && target.dataset.teamId) {
         navigate('/dashboard?teamId=' + encodeURIComponent(target.dataset.teamId));
+      } else if (target.dataset.inviteAction && target.dataset.teamId) {
+        if (target.dataset.inviteAction === "accept") {
+          await acceptInvite(target.dataset.teamId);
+        } else if (target.dataset.inviteAction === "reject") {
+          await rejectInvite(target.dataset.teamId);
+        }
       } else if (target.dataset.navigate) {
         navigate(target.dataset.navigate.replace('.html', ''));
       } else if (target.dataset.action === 'switchView') {

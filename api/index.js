@@ -14,8 +14,13 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 const SESSION_COOKIE = "collabspace_session";
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 30;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
+  if (IS_PRODUCTION) {
+    console.error("FATAL: SESSION_SECRET environment variable is required in production.");
+    process.exit(1);
+  }
   console.warn("WARNING: SESSION_SECRET not set. Using insecure default for local dev only.");
 }
 const EFFECTIVE_SESSION_SECRET = SESSION_SECRET || "collabspace-local-development-secret-DO-NOT-USE-IN-PROD";
@@ -23,7 +28,7 @@ const TASK_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
 
 // GEMINI INTEGRATION
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-1.5-pro";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 function callGemini(promptText) {
   return new Promise((resolve, reject) => {
@@ -547,7 +552,54 @@ function verifySessionToken(token) {
   }
 }
 
-function publicUser(user) {
+function buildMembershipContext(user, teams = []) {
+  if (!user || !Array.isArray(teams)) {
+    return { memberships: [], primaryMembership: null };
+  }
+
+  const memberships = teams
+    .map((team) => {
+      const member = Array.isArray(team.members)
+        ? team.members.find((candidate) => candidate.userId === user.id)
+        : null;
+
+      if (!member) {
+        return null;
+      }
+
+      const resolvedRole = String(
+        member.role || (team.createdBy === user.id ? "Leader" : "Member")
+      ).trim() || "Member";
+      const joinedAt = String(member.joinedAt || team.createdAt || "").trim();
+      const timestamp = Date.parse(joinedAt);
+
+      return {
+        isLeader: team.createdBy === user.id || isLeadRole(resolvedRole),
+        role: resolvedRole,
+        teamId: String(team.id || "").trim(),
+        teamName: String(team.name || "").trim(),
+        timestamp: Number.isFinite(timestamp) ? timestamp : 0
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => {
+      if (left.isLeader !== right.isLeader) {
+        return Number(right.isLeader) - Number(left.isLeader);
+      }
+
+      return right.timestamp - left.timestamp;
+    });
+
+  return {
+    memberships,
+    primaryMembership: memberships[0] || null
+  };
+}
+
+async function buildPublicUser(user) {
+  const teams = await readTeams();
+  const { primaryMembership } = buildMembershipContext(user, teams);
+
   return {
     about: String(user.about || "").trim(),
     course: user.course || "",
@@ -556,9 +608,9 @@ function publicUser(user) {
     id: user.id,
     name: user.name,
     profileUpdatedAt: user.profileUpdatedAt || "",
-    role: user.role,
+    role: primaryMembership?.role || "Member",
     skills: Array.isArray(user.skills) ? user.skills : [],
-    teamName: user.teamName,
+    teamName: primaryMembership?.teamName || "",
     workFocus: Array.isArray(user.workFocus) ? user.workFocus : [],
     year: user.year || ""
   };
@@ -713,7 +765,7 @@ async function handleRegister(req, res) {
       201,
       {
         message: "Account created successfully.",
-        user: publicUser(user)
+        user: await buildPublicUser(user)
       },
       {
         "Set-Cookie": buildSessionCookie(user)
@@ -742,7 +794,7 @@ async function handleLogin(req, res) {
       200,
       {
         message: "Welcome back.",
-        user: publicUser(user)
+        user: await buildPublicUser(user)
       },
       {
         "Set-Cookie": buildSessionCookie(user)
@@ -761,7 +813,7 @@ async function handleMe(req, res) {
     return;
   }
 
-  sendJson(res, 200, { user: publicUser(user) });
+  sendJson(res, 200, { user: await buildPublicUser(user) });
 }
 
 function handleLogout(res) {
@@ -1740,7 +1792,7 @@ async function handleUpdateProfile(req, res) {
     // Read back the updated user for the response
     const users = await readUsers();
     const updatedUser = users.find(u => u.id === user.id);
-    sendJson(res, 200, { user: publicUser(updatedUser || user) });
+    sendJson(res, 200, { user: await buildPublicUser(updatedUser || user) });
 
     // Trigger role recalculation in the background (non-blocking)
     recalculateAllRoles().catch((err) =>

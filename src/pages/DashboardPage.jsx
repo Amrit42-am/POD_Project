@@ -164,6 +164,14 @@ function normalizeTask(task = {}) {
     ...task,
     assignee: String(task.assignee || "").trim(),
     assigneeId: String(task.assigneeId || "").trim(),
+    assignees: Array.isArray(task.assignees)
+      ? task.assignees
+        .map((assignee) => ({
+          id: String(assignee?.id || "").trim(),
+          name: String(assignee?.name || "").trim()
+        }))
+        .filter((assignee) => assignee.id || assignee.name)
+      : [],
     archivedAt: String(task.archivedAt || "").trim(),
     completedAt: String(task.completedAt || task.doneAt || "").trim(),
     comments: Array.isArray(task.comments) ? task.comments : [],
@@ -202,6 +210,10 @@ function isCurrentUserLeader() {
 function isTaskAssignedToCurrentUser(task) {
   if (!task || !currentUser) {
     return false;
+  }
+
+  if (Array.isArray(task.assignees) && task.assignees.some((assignee) => assignee?.id === currentUser.id)) {
+    return true;
   }
 
   const assigneeId = String(task.assigneeId || "").trim();
@@ -266,8 +278,8 @@ function syncTaskAssigneeOptions(selectedMemberIds = [], isEditMode = false, tas
     const disabledAttr = isDisabled ? "disabled" : "";
     html += `
       <label style="display: flex; align-items: center; gap: 8px; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; opacity: ${isDisabled ? '0.6' : '1'};">
-        <input type="checkbox" class="assignee-checkbox" value="${member.userId}" data-name="${member.name}" ${isChecked} ${disabledAttr} />
-        ${member.name}
+        <input type="checkbox" class="assignee-checkbox" value="${escapeHtml(member.userId)}" data-name="${escapeHtml(member.name)}" ${isChecked} ${disabledAttr} />
+        ${escapeHtml(member.name)}
       </label>
     `;
   });
@@ -364,6 +376,10 @@ function buildContributionModel() {
   const memberRows = members
     .map((member, index) => {
       const assignedTasks = tasks.filter((task) => {
+        if (Array.isArray(task.assignees) && task.assignees.some((assignee) => assignee?.id === member.userId)) {
+          return true;
+        }
+
         const assigneeId = String(task.assigneeId || "").trim();
         const assigneeName = String(task.assignee || "").trim();
         return (
@@ -625,7 +641,7 @@ async function loadTeam() {
     teamList.innerHTML = teamData.members.map(m => `
       <div class="team-member-row">
         <div class="team-member-main">
-          <div class="team-member-avatar">${initialsForName(escapeHtml(m.name))}</div>
+          <div class="team-member-avatar">${escapeHtml(initialsForName(m.name))}</div>
           <div class="team-member-copy">
             <strong class="team-member-name">${escapeHtml(m.name)}</strong>
             <span class="team-member-role team-member-role-badge">${escapeHtml(m.role || "Member")}</span>

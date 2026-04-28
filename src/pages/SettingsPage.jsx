@@ -192,6 +192,9 @@ export default function SettingsPage() {
           });
 
           currentUser = payload.user || currentUser;
+          if (payload.user) {
+            setCurrentUser(payload.user);
+          }
           setTagValues("skills", Array.isArray(currentUser.skills) ? currentUser.skills : []);
           setTagValues("workFocus", Array.isArray(currentUser.workFocus) ? currentUser.workFocus : []);
           alert("Looking good! Profile updated.");
