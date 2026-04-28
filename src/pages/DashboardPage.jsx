@@ -229,57 +229,68 @@ function findTaskById(taskId) {
   return [...tasksData, ...archivedTasksData].find((task) => task?.id === taskId) || null;
 }
 
-function getTaskAssigneeMemberId(task) {
+function getTaskAssigneeMemberIds(task) {
+  if (!task) return [];
   const members = Array.isArray(teamData?.members) ? teamData.members : [];
-
-  if (task?.assigneeId) {
-    const byId = members.find((member) => member.userId === task.assigneeId);
-    if (byId) {
-      return byId.userId;
-    }
+  
+  if (Array.isArray(task.assignees) && task.assignees.length > 0) {
+    return task.assignees.map(a => a.id);
   }
 
-  const byName = members.find((member) => String(member.name || "").trim() === String(task?.assignee || "").trim());
-  return byName?.userId || "";
+  if (task.assigneeId) {
+    const byId = members.find((member) => member.userId === task.assigneeId);
+    if (byId) return [byId.userId];
+  }
+
+  const byName = members.find((member) => String(member.name || "").trim() === String(task.assignee || "").trim());
+  return byName?.userId ? [byName.userId] : [];
 }
 
-function syncTaskAssigneeOptions(selectedMemberId = "", isEditMode = false) {
-  const assigneeSelect = document.getElementById("task-assignee");
+function syncTaskAssigneeOptions(selectedMemberIds = [], isEditMode = false, taskStatus = "To Do") {
+  const container = document.getElementById("task-assignees-container");
   const members = Array.isArray(teamData?.members) ? teamData.members : [];
 
-  if (!assigneeSelect) {
-    return;
-  }
+  if (!container) return;
 
-  const defaultLabel = isEditMode ? "Unassigned" : "✨ Auto-assign with AI";
-  assigneeSelect.innerHTML = `<option value="">${defaultLabel}</option>` + members
-    .map((member) => `<option value="${member.userId}">${member.name}</option>`)
-    .join("");
-
-  assigneeSelect.value = members.some((member) => member.userId === selectedMemberId)
-    ? selectedMemberId
-    : "";
+  const isDisabled = isEditMode && taskStatus === "In Progress";
+  
+  let html = `<div style="margin-bottom: 8px; font-size: 0.9em; color: var(--text-muted);">
+    ${isEditMode ? "" : "Leave empty to ✨ Auto-assign with AI."}
+    ${isDisabled ? "<strong style='color: var(--warning)'>Cannot change assignees while task is In Progress.</strong>" : ""}
+  </div>`;
+  
+  html += `<div style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface);">`;
+  
+  members.forEach((member) => {
+    const isChecked = selectedMemberIds.includes(member.userId) ? "checked" : "";
+    const disabledAttr = isDisabled ? "disabled" : "";
+    html += `
+      <label style="display: flex; align-items: center; gap: 8px; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; opacity: ${isDisabled ? '0.6' : '1'};">
+        <input type="checkbox" class="assignee-checkbox" value="${member.userId}" data-name="${member.name}" ${isChecked} ${disabledAttr} />
+        ${member.name}
+      </label>
+    `;
+  });
+  
+  html += `</div>`;
+  container.innerHTML = html;
 }
 
 function getSelectedAssigneePayload() {
-  const assigneeSelect = document.getElementById("task-assignee");
-  const assigneeId = String(assigneeSelect?.value || "").trim();
+  const checkboxes = document.querySelectorAll("#task-assignees-container .assignee-checkbox:checked");
+  const assignees = Array.from(checkboxes).map(cb => ({
+    id: cb.value,
+    name: cb.dataset.name
+  }));
+  
+  return { assignees };
+}
 
-  if (!assigneeId) {
-    return { assignee: "", assigneeId: "" };
+function formatTaskAssignees(task) {
+  if (Array.isArray(task?.assignees) && task.assignees.length > 0) {
+    return task.assignees.map(a => String(a.name || "").trim()).filter(Boolean).join(", ");
   }
-
-  const members = Array.isArray(teamData?.members) ? teamData.members : [];
-  const member = members.find((candidate) => candidate.userId === assigneeId);
-
-  if (!member) {
-    throw new Error("Please choose a valid team member.");
-  }
-
-  return {
-    assignee: String(member.name || "").trim(),
-    assigneeId: String(member.userId || "").trim()
-  };
+  return String(task?.assignee || "Unassigned").trim() || "Unassigned";
 }
 
 function getCompletionWindowLabel(task) {
@@ -606,7 +617,7 @@ async function loadTeam() {
         addTaskButton.disabled = true;
         addTaskButton.title = "Join or create a team to manage tasks";
       }
-      syncTaskAssigneeOptions("", false);
+      syncTaskAssigneeOptions([], false);
       updateContributionSourceState("team", "success");
       return;
     }
@@ -628,7 +639,7 @@ async function loadTeam() {
       invitePanel.style.display = isCurrentUserLeader() ? "block" : "none";
     }
 
-    syncTaskAssigneeOptions("", false);
+    syncTaskAssigneeOptions([], false);
 
     const addTaskButton = document.getElementById("add-task-btn");
     if (addTaskButton) {
@@ -766,7 +777,7 @@ function renderTasks() {
       <div class="task-title">${task.title}</div>
       <div class="task-desc">${task.description || "No description provided."}</div>
       <div class="task-meta">
-        <strong class="task-assignee">${task.assignee || "Unassigned"}</strong>
+        <strong class="task-assignee" title="${formatTaskAssignees(task)}">${formatTaskAssignees(task)}</strong>
         <span class="task-urgency">${task.priority || "Normal"}</span>
       </div>
       ${actionMarkup}
@@ -814,7 +825,7 @@ function renderArchivedTasks() {
         <div class="archive-meta-grid">
           <div class="archive-meta-item">
             <span class="archive-meta-label">Assignee</span>
-            <strong>${task.assignee || "Unassigned"}</strong>
+            <strong title="${formatTaskAssignees(task)}">${formatTaskAssignees(task)}</strong>
           </div>
           <div class="archive-meta-item">
             <span class="archive-meta-label">Completed</span>
@@ -997,7 +1008,7 @@ function resetTaskModalState() {
     taskForm.reset();
   }
 
-  syncTaskAssigneeOptions("", false);
+  syncTaskAssigneeOptions([], false);
 }
 
 function openTaskModal(mode = "create", task = null) {
@@ -1024,7 +1035,7 @@ function openTaskModal(mode = "create", task = null) {
 
     document.getElementById("task-title").value = task.title || "";
     document.getElementById("task-desc").value = task.description || "";
-    syncTaskAssigneeOptions(getTaskAssigneeMemberId(task), true);
+    syncTaskAssigneeOptions(getTaskAssigneeMemberIds(task), true, task.status);
   } else {
     resetTaskModalState();
   }
@@ -1383,9 +1394,7 @@ bootstrap();
       </div>
       <div className="modal-field">
         <label>Assign To</label>
-        <select className="modal-select" id="task-assignee">
-          <option value="">✨ Auto-assign with AI</option>
-        </select>
+        <div id="task-assignees-container" className="checkbox-list"></div>
       </div>
       <div className="modal-actions">
         <button type="button" id="close-task-modal" className="btn btn-ghost">Cancel</button>

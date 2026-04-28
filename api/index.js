@@ -834,25 +834,42 @@ async function handleCreateTask(req, res) {
     const tasks = await readTasks();
 
     // Auto-assign using AI mechanism based on skills and task content
-    let autoAssignee = assignee;
-    let autoAssigneeId = String(body.assigneeId || "").trim();
+    let autoAssignees = [];
+    
+    // Read the array format if provided
+    if (Array.isArray(body.assignees) && body.assignees.length > 0) {
+      for (const a of body.assignees) {
+        if (a && a.id) {
+           autoAssignees.push({ id: String(a.id), name: String(a.name) });
+        }
+      }
+    } else if (body.assignee || body.assigneeId) {
+      // Backwards compatibility for single string format
+      autoAssignees.push({ 
+        id: String(body.assigneeId || "").trim(), 
+        name: String(body.assignee || "").trim() 
+      });
+    }
 
-    if (autoAssignee || autoAssigneeId) {
-      const resolvedAssignee = resolveTaskAssignee(team, autoAssignee, autoAssigneeId);
-      if (!resolvedAssignee) {
-        sendJson(res, 400, { error: "Please choose a valid team member." });
+    if (autoAssignees.length > 0) {
+      const validAssignees = [];
+      for (const a of autoAssignees) {
+        const resolvedAssignee = resolveTaskAssignee(team, a.name, a.id);
+        if (resolvedAssignee) {
+          validAssignees.push({ id: resolvedAssignee.assigneeId, name: resolvedAssignee.assignee });
+        }
+      }
+      if (validAssignees.length === 0) {
+        sendJson(res, 400, { error: "Please choose valid team members." });
         return;
       }
-
-      autoAssignee = resolvedAssignee.assignee;
-      autoAssigneeId = resolvedAssignee.assigneeId;
+      autoAssignees = validAssignees;
     }
     
-    // If an explicit assignee wasn't provided, use AI to find the best match
-    if (team && !autoAssignee && !autoAssigneeId) {
+    // If no assignees provided, use AI
+    if (team && autoAssignees.length === 0) {
       if (!team.members || team.members.length === 0) {
-        autoAssignee = user.name;
-        autoAssigneeId = user.id;
+        autoAssignees.push({ id: user.id, name: user.name });
       } else {
         const users = await readUsers();
         const teamDataStr = JSON.stringify(team.members.map(m => {
@@ -865,38 +882,42 @@ async function handleCreateTask(req, res) {
             workFocus: fullUser.workFocus || []
           };
         }));
+        
+        const isSmallTeam = team.members.length <= 3;
+        const promptInstruction = isSmallTeam 
+          ? "Who are the absolute best team members to complete this task? You may assign multiple people if they share responsibilities. Return ONLY a comma-separated list of their exact ID values (UUID format). DO NOT output anything else."
+          : "Who is the absolute best single team member to complete this task? Return ONLY their exact ID value (UUID format). DO NOT output anything else.";
+
         const prompt = `You are an AI task assigner. 
 Task Title: "${title}"
 Description: "${description}"
 Team Members: ${teamDataStr}
 
-Who is the absolute best single team member to complete this task based on their role, skills, work focus, and the context of the task? 
-Return ONLY their exact ID value (the UUID format). DO NOT output anything else.`;
+Based on their role, skills, work focus, and the context of the task, ${promptInstruction}`;
 
         try {
           let geminiResponse = await callGemini(prompt);
           
-          // Robustly extract UUID using regex to ignore any conversational text the AI might add
-          const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-          const match = geminiResponse.match(uuidRegex);
+          // Robustly extract UUID using regex
+          const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig;
+          const matches = geminiResponse.match(uuidRegex);
           
-          if (match) {
-            const geminiAssigneeId = match[0];
-            const bestMember = team.members.find(m => m.userId === geminiAssigneeId);
-            if (bestMember) {
-              autoAssignee = bestMember.name;
-              autoAssigneeId = bestMember.userId;
-            } else {
-              throw new Error("AI returned a UUID that is not in the team");
+          if (matches && matches.length > 0) {
+            for (const match of matches) {
+              const bestMember = team.members.find(m => m.userId === match);
+              if (bestMember) {
+                 autoAssignees.push({ id: bestMember.userId, name: bestMember.name });
+              }
             }
-          } else {
-             throw new Error("AI did not return a valid UUID");
+          }
+          
+          if (autoAssignees.length === 0) {
+             throw new Error("AI did not return any valid UUIDs");
           }
         } catch(err) {
              console.error("Task Gemini Assignment failed", err);
              const fallbackMember = team.members.find((m) => isLeadRole(m.role)) || team.members[0];
-             autoAssignee = fallbackMember.name;
-             autoAssigneeId = fallbackMember.userId;
+             autoAssignees.push({ id: fallbackMember.userId, name: fallbackMember.name });
         }
       }
     }
@@ -905,8 +926,9 @@ Return ONLY their exact ID value (the UUID format). DO NOT output anything else.
       id: crypto.randomUUID(),
       title,
       description: description || "",
-      assignee: autoAssignee || "",
-      assigneeId: autoAssigneeId || "",
+      assignee: autoAssignees[0] ? autoAssignees[0].name : "",
+      assigneeId: autoAssignees[0] ? autoAssignees[0].id : "",
+      assignees: autoAssignees,
       archivedAt: "",
       completedAt: "",
       status: forcedStatus,
@@ -1011,15 +1033,41 @@ async function handleUpdateTask(req, res, taskId) {
         task[field] = String(body[field] || "").trim();
       }
 
-      if (body.assignee !== undefined || body.assigneeId !== undefined) {
-        const resolvedAssignee = resolveTaskAssignee(team, body.assignee, body.assigneeId);
-        if (!resolvedAssignee) {
-          sendJson(res, 400, { error: "Please choose a valid team member." });
+      if (body.assignee !== undefined || body.assigneeId !== undefined || body.assignees !== undefined) {
+        if (currentStatus === "In Progress") {
+          sendJson(res, 400, { error: "Cannot change assignees while the task is In Progress." });
           return;
         }
 
-        task.assignee = resolvedAssignee.assignee;
-        task.assigneeId = resolvedAssignee.assigneeId;
+        let newAssignees = [];
+        if (Array.isArray(body.assignees) && body.assignees.length > 0) {
+          for (const a of body.assignees) {
+            if (a && a.id) newAssignees.push({ id: String(a.id), name: String(a.name) });
+          }
+        } else if (body.assignee || body.assigneeId) {
+          newAssignees.push({ id: String(body.assigneeId || "").trim(), name: String(body.assignee || "").trim() });
+        } else if (body.assignees !== undefined && Array.isArray(body.assignees) && body.assignees.length === 0) {
+          // Explicitly cleared
+        }
+
+        if (newAssignees.length > 0) {
+          const validAssignees = [];
+          for (const a of newAssignees) {
+            const resolvedAssignee = resolveTaskAssignee(team, a.name, a.id);
+            if (resolvedAssignee) {
+              validAssignees.push({ id: resolvedAssignee.assigneeId, name: resolvedAssignee.assignee });
+            }
+          }
+          if (validAssignees.length === 0) {
+            sendJson(res, 400, { error: "Please choose valid team members." });
+            return;
+          }
+          newAssignees = validAssignees;
+        }
+
+        task.assignee = newAssignees[0] ? newAssignees[0].name : "";
+        task.assigneeId = newAssignees[0] ? newAssignees[0].id : "";
+        task.assignees = newAssignees;
       }
     }
 
@@ -1639,7 +1687,11 @@ async function handleGetAnalytics(req, res) {
   // Contribution per member
   const contributions = {};
   for (const member of members) {
-    const memberTasks = teamTasks.filter((t) => t.assignee === member.name || t.assigneeId === member.userId);
+    const memberTasks = teamTasks.filter((t) => 
+      t.assigneeId === member.userId || 
+      t.assignee === member.name || 
+      (Array.isArray(t.assignees) && t.assignees.some(a => a.id === member.userId))
+    );
     const memberCompleted = memberTasks.filter((t) => normalizeTaskStatus(t.status) === "Done").length;
     contributions[member.name] = {
       total: memberTasks.length,
