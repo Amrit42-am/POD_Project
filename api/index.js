@@ -854,26 +854,43 @@ async function handleCreateTask(req, res) {
         autoAssignee = user.name;
         autoAssigneeId = user.id;
       } else {
-        const teamDataStr = JSON.stringify(team.members.map(m => ({ id: m.userId, name: m.name, role: m.role || "Member" })));
+        const users = await readUsers();
+        const teamDataStr = JSON.stringify(team.members.map(m => {
+          const fullUser = users.find(u => u.id === m.userId) || {};
+          return { 
+            id: m.userId, 
+            name: m.name, 
+            role: m.role || "Member",
+            skills: fullUser.skills || [],
+            workFocus: fullUser.workFocus || []
+          };
+        }));
         const prompt = `You are an AI task assigner. 
 Task Title: "${title}"
 Description: "${description}"
 Team Members: ${teamDataStr}
 
-Who is the absolute best single team member to complete this task based on their role and the context of the task? 
-Return ONLY their exact ID value. DO NOT output anything else.`;
+Who is the absolute best single team member to complete this task based on their role, skills, work focus, and the context of the task? 
+Return ONLY their exact ID value (the UUID format). DO NOT output anything else.`;
 
         try {
-          let geminiAssigneeId = await callGemini(prompt);
-          geminiAssigneeId = geminiAssigneeId.trim().replace(/^"|"$/g, ''); // strip quotes
-          const bestMember = team.members.find(m => m.userId === geminiAssigneeId);
-          if (bestMember) {
-            autoAssignee = bestMember.name;
-            autoAssigneeId = bestMember.userId;
+          let geminiResponse = await callGemini(prompt);
+          
+          // Robustly extract UUID using regex to ignore any conversational text the AI might add
+          const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+          const match = geminiResponse.match(uuidRegex);
+          
+          if (match) {
+            const geminiAssigneeId = match[0];
+            const bestMember = team.members.find(m => m.userId === geminiAssigneeId);
+            if (bestMember) {
+              autoAssignee = bestMember.name;
+              autoAssigneeId = bestMember.userId;
+            } else {
+              throw new Error("AI returned a UUID that is not in the team");
+            }
           } else {
-             const fallbackMember = team.members.find((m) => isLeadRole(m.role)) || team.members[0];
-             autoAssignee = fallbackMember.name;
-             autoAssigneeId = fallbackMember.userId;
+             throw new Error("AI did not return a valid UUID");
           }
         } catch(err) {
              console.error("Task Gemini Assignment failed", err);
