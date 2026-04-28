@@ -480,11 +480,57 @@ async function bootstrap() {
     switchView(requestedView === "profile" ? "profile" : "projects");
 
     await loadProjects();
+    await checkInvitations();
   } catch (err) {
     console.error(err);
     navigate("/index.html");
   }
 }
+
+async function checkInvitations() {
+  try {
+    const res = await request("/api/user/invitations", { method: "GET" });
+    const invites = res.invitations || [];
+    const btn = document.getElementById("nav-invites-btn");
+    const container = document.getElementById("invites-content");
+    const modal = document.getElementById("invites-modal");
+    
+    if(btn && invites.length > 0) {
+      btn.style.display = "inline-flex";
+      btn.textContent = `Invites (${invites.length})`;
+      btn.style.color = "var(--warning)";
+      btn.onclick = () => modal.showModal();
+      
+      container.innerHTML = invites.map(i => `
+        <div class="invite-card">
+          <div class="invite-title">${i.teamName}</div>
+          <div class="invite-subtitle">Invited by ${i.invitedByName}</div>
+          <div class="invite-actions">
+            <button class="btn btn-primary" onclick="acceptInvite('${i.teamId}')">Accept</button>
+            <button class="btn btn-ghost" onclick="rejectInvite('${i.teamId}')">Reject</button>
+          </div>
+        </div>
+      `).join('');
+    } else if(btn) {
+      btn.style.display = "none";
+      if(modal.open) modal.close();
+    }
+  } catch(e) { }
+}
+
+window.acceptInvite = async (teamId) => {
+  try {
+    await request("/api/team/invitations/accept", { method: "POST", body: JSON.stringify({ teamId }) });
+    window.location.reload();
+  } catch(e) { alert("Failed to accept"); }
+};
+
+window.rejectInvite = async (teamId) => {
+  try {
+    await request("/api/team/invitations/reject", { method: "POST", body: JSON.stringify({ teamId }) });
+    checkInvitations();
+  } catch(e) { alert("Failed to reject"); }
+};
 
 async function loadProjects() {
   try {
@@ -642,6 +688,7 @@ async function logout() {
         <button id="nav-btn-projects" className="sidebar-nav-item active" data-action="switchView" data-view-args="projects">
           <span>Workspace Hub</span>
         </button>
+        <button id="nav-invites-btn" className="sidebar-nav-item" style={{display: 'none'}}>Invites (0)</button>
         <button id="nav-btn-profile" className="sidebar-nav-item" data-action="switchView" data-view-args="profile">
           <span>Profile</span>
         </button>
@@ -775,6 +822,18 @@ async function logout() {
         <button type="submit" className="btn btn-primary">Initialize</button>
       </div>
     </form>
+    </div>
+  </dialog>
+
+  <dialog id="invites-modal">
+    <div className="modal-shell">
+    <div className="modal-header">
+      <h3 className="modal-title">Pending Invites</h3>
+      <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('invites-modal').close()}>Close</button>
+    </div>
+    <div id="invites-content" className="modal-form">
+      
+    </div>
     </div>
   </dialog>
 
