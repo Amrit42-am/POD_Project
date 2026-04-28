@@ -288,9 +288,9 @@ function getSelectedAssigneePayload() {
 
 function formatTaskAssignees(task) {
   if (Array.isArray(task?.assignees) && task.assignees.length > 0) {
-    return task.assignees.map(a => String(a.name || "").trim()).filter(Boolean).join(", ");
+    return task.assignees.map(a => escapeHtml(String(a.name || "").trim())).filter(Boolean).join(", ");
   }
-  return String(task?.assignee || "Unassigned").trim() || "Unassigned";
+  return escapeHtml(String(task?.assignee || "Unassigned").trim() || "Unassigned");
 }
 
 function getCompletionWindowLabel(task) {
@@ -625,10 +625,10 @@ async function loadTeam() {
     teamList.innerHTML = teamData.members.map(m => `
       <div class="team-member-row">
         <div class="team-member-main">
-          <div class="team-member-avatar">${initialsForName(m.name)}</div>
+          <div class="team-member-avatar">${initialsForName(escapeHtml(m.name))}</div>
           <div class="team-member-copy">
-            <strong class="team-member-name">${m.name}</strong>
-            <span class="team-member-role team-member-role-badge">${m.role || "Member"}</span>
+            <strong class="team-member-name">${escapeHtml(m.name)}</strong>
+            <span class="team-member-role team-member-role-badge">${escapeHtml(m.role || "Member")}</span>
           </div>
         </div>
       </div>
@@ -774,11 +774,11 @@ function renderTasks() {
         <span class="task-state-pill ${targetStatus === "Done" ? "is-completed" : "is-active"}">${targetStatus === "Done" ? "Completed" : "Active"}</span>
         ${!canMove ? `<span class="task-state-pill is-locked">View Only</span>` : ""}
       </div>
-      <div class="task-title">${task.title}</div>
-      <div class="task-desc">${task.description || "No description provided."}</div>
+      <div class="task-title">${escapeHtml(task.title)}</div>
+      <div class="task-desc">${escapeHtml(task.description || "No description provided.")}</div>
       <div class="task-meta">
         <strong class="task-assignee" title="${formatTaskAssignees(task)}">${formatTaskAssignees(task)}</strong>
-        <span class="task-urgency">${task.priority || "Normal"}</span>
+        <span class="task-urgency">${escapeHtml(task.priority || "Normal")}</span>
       </div>
       ${actionMarkup}
     `;
@@ -820,8 +820,8 @@ function renderArchivedTasks() {
           <span class="task-state-pill is-archived">Archived</span>
           <span class="task-state-pill is-locked">Locked</span>
         </div>
-        <h3 class="archive-card-title">${task.title}</h3>
-        <p class="archive-card-desc">${task.description || "No description provided."}</p>
+        <h3 class="archive-card-title">${escapeHtml(task.title)}</h3>
+        <p class="archive-card-desc">${escapeHtml(task.description || "No description provided.")}</p>
         <div class="archive-meta-grid">
           <div class="archive-meta-item">
             <span class="archive-meta-label">Assignee</span>
@@ -1205,7 +1205,7 @@ if (logoutBtn) {
 }
 
 // Reload messages every 5 seconds to keep chat fresh!
-setInterval(loadMessages, 5000);
+window._chatPollInterval = setInterval(loadMessages, 5000);
 
 bootstrap();
 
@@ -1239,7 +1239,10 @@ bootstrap();
     return () => {
       document.removeEventListener('click', handleGlobalClick);
       window.URLSearchParams = originalURLSearchParams; // restore
-      if (window.pollingInterval) clearInterval(window.pollingInterval);
+      if (window._chatPollInterval) {
+        clearInterval(window._chatPollInterval);
+        window._chatPollInterval = null;
+      }
     };
   }, [authCurrentUser, navigate, location.search]);
 

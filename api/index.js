@@ -14,8 +14,11 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 const SESSION_COOKIE = "collabspace_session";
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 30;
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "collabspace-local-development-secret";
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  console.warn("WARNING: SESSION_SECRET not set. Using insecure default for local dev only.");
+}
+const EFFECTIVE_SESSION_SECRET = SESSION_SECRET || "collabspace-local-development-secret-DO-NOT-USE-IN-PROD";
 const TASK_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
 
 // GEMINI INTEGRATION
@@ -91,7 +94,7 @@ async function connectToDatabase() {
 }
 
 // Connect on startup
-connectToDatabase();
+connectToDatabase().then(() => ensureIndexes());
 
 /* ── Helpers ─────────────────────────────────────────── */
 
@@ -150,6 +153,7 @@ function parseCookies(req) {
 }
 
 function serializeCookie(name, value, options = {}) {
+  const isProduction = process.env.NODE_ENV === "production";
   const parts = [`${name}=${encodeURIComponent(value)}`];
 
   if (options.httpOnly !== false) {
@@ -167,7 +171,7 @@ function serializeCookie(name, value, options = {}) {
     parts.push(`Expires=${options.expires.toUTCString()}`);
   }
 
-  if (options.secure) {
+  if (options.secure || isProduction) {
     parts.push("Secure");
   }
 
@@ -212,72 +216,67 @@ async function readJsonBody(req) {
   return JSON.parse(rawBody);
 }
 
-/* ── MongoDB Collection Helpers ──────────────────────── */
+/* ── MongoDB Collection Helpers (Atomic Operations) ──── */
 
-async function readUsers() {
+async function getCollection(name) {
   const database = await connectToDatabase();
-  const docs = await database.collection("users").find({}).toArray();
+  return database.collection(name);
+}
+
+async function ensureIndexes() {
+  const database = await connectToDatabase();
+  await database.collection("users").createIndex({ id: 1 }, { unique: true });
+  await database.collection("users").createIndex({ email: 1 }, { unique: true });
+  await database.collection("teams").createIndex({ id: 1 }, { unique: true });
+  await database.collection("tasks").createIndex({ id: 1 }, { unique: true });
+  await database.collection("messages").createIndex({ id: 1 }, { unique: true });
+  console.log("✅ MongoDB indexes ensured");
+}
+
+// Read helpers (safe — read-only)
+async function readUsers() {
+  const col = await getCollection("users");
+  const docs = await col.find({}).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
 
-async function writeUsers(users) {
-  const database = await connectToDatabase();
-  const col = database.collection("users");
-  await col.deleteMany({});
-  if (users.length > 0) {
-    await col.insertMany(users);
-  }
-}
-
 async function readTasks() {
-  const database = await connectToDatabase();
-  const rawTasks = await database.collection("tasks").find({}).toArray();
+  const col = await getCollection("tasks");
+  const rawTasks = await col.find({}).toArray();
   const cleaned = rawTasks.map(({ _id, ...rest }) => rest);
   return cleaned.map((task) => normalizeStoredTask(task));
 }
 
-async function writeTasks(tasks) {
-  const database = await connectToDatabase();
-  const col = database.collection("tasks");
-  await col.deleteMany({});
-  if (tasks.length > 0) {
-    await col.insertMany(tasks);
-  }
-}
-
 async function readTeams() {
-  const database = await connectToDatabase();
-  const docs = await database.collection("teams").find({}).toArray();
+  const col = await getCollection("teams");
+  const docs = await col.find({}).toArray();
   return docs.map(({ _id, ...rest }) => rest);
-}
-
-async function writeTeams(teams) {
-  const database = await connectToDatabase();
-  const col = database.collection("teams");
-  await col.deleteMany({});
-  if (teams.length > 0) {
-    await col.insertMany(teams);
-  }
 }
 
 async function readMessages() {
-  const database = await connectToDatabase();
-  const docs = await database.collection("messages").find({}).toArray();
+  const col = await getCollection("messages");
+  const docs = await col.find({}).toArray();
   return docs.map(({ _id, ...rest }) => rest);
 }
 
-async function writeMessages(messages) {
-  const database = await connectToDatabase();
-  const col = database.collection("messages");
-  await col.deleteMany({});
-  if (messages.length > 0) {
-    await col.insertMany(messages);
-  }
+// Atomic write helpers
+async function insertDoc(collectionName, doc) {
+  const col = await getCollection(collectionName);
+  await col.insertOne(doc);
+}
+
+async function updateDoc(collectionName, filter, update) {
+  const col = await getCollection(collectionName);
+  await col.updateOne(filter, update);
+}
+
+async function deleteDoc(collectionName, filter) {
+  const col = await getCollection(collectionName);
+  await col.deleteOne(filter);
 }
 
 async function appendMessage(message) {
-  const database = await connectToDatabase();
-  await database.collection("messages").insertOne(message);
+  await insertDoc("messages", message);
 }
 
 /* ── Auth helpers ────────────────────────────────────── */
@@ -296,23 +295,27 @@ function isLeadRole(role) {
 }
 
 function isLeadUser(user, team = null) {
-  if (!user) {
+  if (!user || !team) {
     return false;
   }
 
-  if (team?.createdBy === user.id) {
-    return true;
-  }
-
-  if (isLeadRole(user.role)) {
+  if (team.createdBy === user.id) {
     return true;
   }
 
   return Boolean(
-    team?.members?.some(
+    team.members?.some(
       (member) => member.userId === user.id && isLeadRole(member.role)
     )
   );
+}
+
+function requireLeader(user, team, res) {
+  if (!isLeadUser(user, team)) {
+    sendJson(res, 403, { error: "Only the team leader can perform this action." });
+    return false;
+  }
+  return true;
 }
 
 function getRequestedTeamId(req, body = null) {
@@ -333,6 +336,12 @@ function isTaskAssignedToUser(task, user) {
     return false;
   }
 
+  // Check the new assignees array first
+  if (Array.isArray(task.assignees) && task.assignees.some(a => a.id === user.id)) {
+    return true;
+  }
+
+  // Legacy fallback for tasks created before multi-assignee
   const assigneeId = String(task.assigneeId || "").trim();
   const assigneeName = String(task.assignee || "").trim();
 
@@ -439,6 +448,7 @@ function normalizeStoredTask(task, now = Date.now()) {
     archivedAt,
     assignee: String(task?.assignee || "").trim(),
     assigneeId: String(task?.assigneeId || "").trim(),
+    assignees: Array.isArray(task?.assignees) ? task.assignees : [],
     completedAt,
     comments: Array.isArray(task?.comments) ? task.comments : [],
     deadline: String(task?.deadline || "").trim(),
@@ -485,7 +495,7 @@ function verifyPassword(password, storedHash) {
 
 function signSessionPayload(encodedPayload) {
   return crypto
-    .createHmac("sha256", SESSION_SECRET)
+    .createHmac("sha256", EFFECTIVE_SESSION_SECRET)
     .update(encodedPayload)
     .digest("base64url");
 }
@@ -696,7 +706,7 @@ async function handleRegister(req, res) {
     };
 
     users.push(user);
-    await writeUsers(users);
+    await insertDoc("users", user);
 
     sendJson(
       res,
@@ -934,7 +944,7 @@ Based on their role, skills, work focus, and the context of the task, ${promptIn
       status: forcedStatus,
       deadline,
       priority,
-      teamName: team.name || user.teamName || "",
+      teamName: team.name || "",
       teamId: team.id || "",
       createdBy: user.id,
       createdByName: user.name,
@@ -943,8 +953,7 @@ Based on their role, skills, work focus, and the context of the task, ${promptIn
       comments: []
     };
 
-    tasks.push(task);
-    await writeTasks(tasks);
+    await insertDoc("tasks", task);
     sendJson(res, 201, { task });
   } catch {
     sendJson(res, 400, { error: "Could not create task." });
@@ -1077,10 +1086,10 @@ async function handleUpdateTask(req, res, taskId) {
       task.archivedAt = "";
     }
 
-    tasks[taskIndex].updatedAt = new Date().toISOString();
+    task.updatedAt = new Date().toISOString();
 
-    await writeTasks(tasks);
-    sendJson(res, 200, { task: normalizeStoredTask(tasks[taskIndex]) });
+    await updateDoc("tasks", { id: taskId }, { $set: task });
+    sendJson(res, 200, { task: normalizeStoredTask(task) });
   } catch {
     sendJson(res, 400, { error: "Could not update task." });
   }
@@ -1114,9 +1123,7 @@ async function handleDeleteTask(req, res, taskId) {
     return;
   }
 
-  const filtered = tasks.filter((task) => task.id !== taskToDelete.id);
-
-  await writeTasks(filtered);
+  await deleteDoc("tasks", { id: taskToDelete.id });
   sendJson(res, 200, { message: "Task deleted." });
 }
 
@@ -1210,16 +1217,7 @@ async function handleCreateTeam(req, res) {
     };
 
     teams.push(team);
-    await writeTeams(teams);
-
-    // Update user's teamName and role
-    const users = await readUsers();
-    const userIndex = users.findIndex((u) => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex].teamName = teamName;
-      users[userIndex].role = "Leader";
-      await writeUsers(users);
-    }
+    await insertDoc("teams", team);
 
     sendJson(res, 201, { team });
   } catch {
@@ -1235,6 +1233,7 @@ async function handleAddMember(req, res) {
     const body = await readJsonBody(req);
     const memberEmail = normalizeEmail(body.email);
     const memberRole = String(body.role || "Member").trim();
+    const teamId = getRequestedTeamId(req, body);
 
     if (!validateEmail(memberEmail)) {
       sendJson(res, 400, { error: "Please enter a valid email address." });
@@ -1242,12 +1241,14 @@ async function handleAddMember(req, res) {
     }
 
     const teams = await readTeams();
-    const team = findUserTeam(teams, user.id);
+    const team = findUserTeam(teams, user.id, teamId);
 
     if (!team) {
       sendJson(res, 404, { error: "You are not in a team. Create one first." });
       return;
     }
+
+    if (!requireLeader(user, team, res)) return;
 
     // Find the member by email
     const users = await readUsers();
@@ -1261,13 +1262,6 @@ async function handleAddMember(req, res) {
     // Check if already in this team
     if (team.members.some((m) => m.userId === memberUser.id)) {
       sendJson(res, 409, { error: "This person is already in your team." });
-      return;
-    }
-
-    // Check if in another team
-    const otherTeam = findUserTeam(teams, memberUser.id);
-    if (otherTeam) {
-      sendJson(res, 409, { error: "This person is already in another team." });
       return;
     }
 
@@ -1289,7 +1283,7 @@ async function handleAddMember(req, res) {
       invitedBy: user.name
     };
     team.invitations.push(invitation);
-    await writeTeams(teams);
+    await updateDoc("teams", { id: team.id }, { $push: { invitations: invitation } });
 
     sendJson(res, 200, { team, invitedMember: invitation });
   } catch {
@@ -1311,6 +1305,7 @@ async function handleGetUserInvitations(req, res) {
         teamId: team.id,
         teamName: team.name,
         invitedBy: invite.invitedBy,
+        invitedByName: invite.invitedBy,
         invitedAt: invite.invitedAt
       });
     }
@@ -1346,35 +1341,26 @@ async function handleAcceptInvitation(req, res) {
     team.invitations = team.invitations.filter(i => i.userId !== user.id);
 
     // Add to members
-    team.members.push({
+    const newMember = {
       userId: user.id,
       name: user.name,
       role: "Member",
       joinedAt: new Date().toISOString()
-    });
-
-    // Update user's profile
-    const users = await readUsers();
-    const userIndex = users.findIndex((u) => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex].teamName = team.name;
-    }
+    };
+    team.members.push(newMember);
 
     // --- AI AUTO-ASSIGNMENT ---
     // Calculate new optimal roles for the entire team now that someone joined
+    const users = await readUsers();
     const suggestions = await suggestRolesForTeam(team.members, users, team.createdBy);
     
-    // Save these roles back to the individuals
+    // Save these roles back to team members only (not user records)
     for (const assignment of suggestions) {
       const member = team.members.find((m) => m.userId === assignment.userId);
       if (member) member.role = assignment.role;
-      
-      const uIndex = users.findIndex((u) => u.id === assignment.userId);
-      if (uIndex !== -1) users[uIndex].role = assignment.role;
     }
 
-    await writeTeams(teams);
-    await writeUsers(users);
+    await updateDoc("teams", { id: team.id }, { $set: { members: team.members, invitations: team.invitations } });
 
     sendJson(res, 200, { message: "Invitation accepted. Roles auto-calibrated." });
   } catch {
@@ -1400,7 +1386,7 @@ async function handleRejectInvitation(req, res) {
 
     if (team.invitations) {
       team.invitations = team.invitations.filter(i => i.userId !== user.id);
-      await writeTeams(teams);
+      await updateDoc("teams", { id: team.id }, { $set: { invitations: team.invitations } });
     }
 
     sendJson(res, 200, { message: "Invitation rejected." });
@@ -1415,13 +1401,16 @@ async function handleUpdateTeam(req, res) {
 
   try {
     const body = await readJsonBody(req);
+    const teamId = getRequestedTeamId(req, body);
     const teams = await readTeams();
-    const team = findUserTeam(teams, user.id);
+    const team = findUserTeam(teams, user.id, teamId);
 
     if (!team) {
       sendJson(res, 404, { error: "Team not found." });
       return;
     }
+
+    if (!requireLeader(user, team, res)) return;
 
     const updatableFields = ["projectTitle", "deadline", "name"];
     for (const field of updatableFields) {
@@ -1430,7 +1419,7 @@ async function handleUpdateTeam(req, res) {
       }
     }
 
-    await writeTeams(teams);
+    await updateDoc("teams", { id: team.id }, { $set: team });
     sendJson(res, 200, { team });
   } catch {
     sendJson(res, 400, { error: "Could not update team." });
@@ -1570,6 +1559,7 @@ async function handleApplyRoleSuggestions(req, res) {
   try {
     const body = await readJsonBody(req);
     const assignments = body.assignments; // [{ userId, role }]
+    const teamId = getRequestedTeamId(req, body);
 
     if (!Array.isArray(assignments) || assignments.length === 0) {
       sendJson(res, 400, { error: "No role assignments provided." });
@@ -1577,12 +1567,14 @@ async function handleApplyRoleSuggestions(req, res) {
     }
 
     const teams = await readTeams();
-    const team = findUserTeam(teams, user.id);
+    const team = findUserTeam(teams, user.id, teamId);
 
     if (!team) {
       sendJson(res, 404, { error: "Team not found." });
       return;
     }
+
+    if (!requireLeader(user, team, res)) return;
 
     const users = await readUsers();
 
@@ -1591,15 +1583,9 @@ async function handleApplyRoleSuggestions(req, res) {
       if (member) {
         member.role = String(assignment.role).trim();
       }
-
-      const userIndex = users.findIndex((u) => u.id === assignment.userId);
-      if (userIndex !== -1) {
-        users[userIndex].role = String(assignment.role).trim();
-      }
     }
 
-    await writeTeams(teams);
-    await writeUsers(users);
+    await updateDoc("teams", { id: team.id }, { $set: { members: team.members } });
     sendJson(res, 200, { team, message: "Roles updated successfully." });
   } catch {
     sendJson(res, 400, { error: "Could not apply role suggestions." });
@@ -1726,38 +1712,35 @@ async function handleUpdateProfile(req, res) {
 
   try {
     const body = await readJsonBody(req);
-    const users = await readUsers();
-    const userIndex = users.findIndex((u) => u.id === user.id);
-
-    if (userIndex === -1) {
-      sendJson(res, 404, { error: "User not found." });
-      return;
-    }
-
-    const updatableFields = ["name", "course", "year", "role"];
+    // Build $set object for atomic update
+    const updateFields = {};
+    const updatableFields = ["name", "course", "year"];
     for (const field of updatableFields) {
       if (body[field] !== undefined) {
-        users[userIndex][field] = String(body[field]).trim();
+        updateFields[field] = String(body[field]).trim();
       }
     }
 
     if (body.about !== undefined) {
-      users[userIndex].about = normalizeProfileText(body.about, 560);
+      updateFields.about = normalizeProfileText(body.about, 560);
     }
 
-    // Handle skills array separately
     if (Array.isArray(body.skills)) {
-      users[userIndex].skills = normalizeProfileTagList(body.skills, 15, 36);
+      updateFields.skills = normalizeProfileTagList(body.skills, 15, 36);
     }
 
     if (Array.isArray(body.workFocus)) {
-      users[userIndex].workFocus = normalizeProfileTagList(body.workFocus, 10, 36);
+      updateFields.workFocus = normalizeProfileTagList(body.workFocus, 10, 36);
     }
 
-    users[userIndex].profileUpdatedAt = new Date().toISOString();
+    updateFields.profileUpdatedAt = new Date().toISOString();
 
-    await writeUsers(users);
-    sendJson(res, 200, { user: publicUser(users[userIndex]) });
+    await updateDoc("users", { id: user.id }, { $set: updateFields });
+
+    // Read back the updated user for the response
+    const users = await readUsers();
+    const updatedUser = users.find(u => u.id === user.id);
+    sendJson(res, 200, { user: publicUser(updatedUser || user) });
 
     // Trigger role recalculation in the background (non-blocking)
     recalculateAllRoles().catch((err) =>
@@ -1940,7 +1923,6 @@ async function recalculateAllRoles() {
   try {
     const teams = await readTeams();
     const users = await readUsers();
-    let updated = false;
 
     for (const team of teams) {
       if (!Array.isArray(team.members) || team.members.length < 2) continue;
@@ -1966,21 +1948,14 @@ async function recalculateAllRoles() {
         for (const assignment of suggestions) {
           const member = team.members.find((m) => m.userId === assignment.userId);
           if (member) member.role = assignment.role;
-
-          const uIndex = users.findIndex((u) => u.id === assignment.userId);
-          if (uIndex !== -1) users[uIndex].role = assignment.role;
         }
         team._rolesCheckedAt = new Date().toISOString();
-        updated = true;
+
+        await updateDoc("teams", { id: team.id }, { $set: { members: team.members, _rolesCheckedAt: team._rolesCheckedAt } });
         console.log(`✅ Roles recalculated for team: ${team.name}`);
       } catch (err) {
         console.error(`❌ Role recalculation failed for team ${team.name}:`, err.message);
       }
-    }
-
-    if (updated) {
-      await writeTeams(teams);
-      await writeUsers(users);
     }
   } catch (err) {
     console.error("Periodic role recalculation error:", err);

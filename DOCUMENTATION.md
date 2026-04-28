@@ -24,7 +24,7 @@ CollabSpace fixes all of this by giving teams a shared workspace where tasks, ro
 ## Key Features
 
 ### 1. Workspace Management
-Create and manage multiple project workspaces. Each workspace is an independent team environment with its own tasks, members, chat, and analytics. Users can lead multiple projects and be members of others simultaneously.
+Create and manage multiple project workspaces. Each workspace is an independent team environment with its own tasks, members, chat, and analytics. Users can lead multiple projects and be members of others simultaneously. All membership and role data is scoped to each team — your role in one project does not affect your role in another.
 
 ### 2. AI-Powered Role Assignment
 When team members join a workspace, CollabSpace uses **Google Gemini AI** to automatically assign the best-fit project role to each member based on their skills and interests. Roles include Developer, Designer, Tester, Project Manager, and Researcher. For small teams (3 or less), the AI assigns combined roles (e.g., "Developer + Tester") to ensure all responsibilities are covered.
@@ -40,7 +40,7 @@ A simple, visual task management system organized into three columns:
 - **In Progress** — Tasks currently being worked on
 - **Done** — Completed tasks
 
-The team leader creates tasks and can either manually assign them to members or let the AI auto-assign based on each member's role and skillset. Team members can update the status of tasks assigned to them.
+The team leader creates tasks and can either manually assign them to specific members, assign to multiple members for smaller teams, or let the AI auto-assign based on each member's role and skillset. Team members can update the status of tasks assigned to them. When a task is "In Progress", its assignees are locked and cannot be changed until the task is moved to another status.
 
 ### 4. AI-Powered Task Assignment
 When creating a new task, the leader can let CollabSpace's AI analyze the task description and match it with the most suitable team member based on their role, skills, and current workload.
@@ -58,7 +58,7 @@ A built-in analytics dashboard shows:
 This gives clear, data-backed proof of who did what — useful for fair grading and accountability.
 
 ### 7. Team Chat
-A real-time messaging system built into every workspace. Team members can discuss the project without switching to WhatsApp or iMessage. Messages are persistent and survive server restarts, so conversation history is always available.
+An auto-refreshing messaging system built into every workspace. Messages are polled every 5 seconds for a near-real-time experience. Team members can discuss the project without switching to WhatsApp or iMessage. Messages are persistent and survive server restarts, so conversation history is always available.
 
 ### 8. Task Archive
 Completed tasks can be archived by the team leader to keep the active board clean while preserving a full record of all finished work.
