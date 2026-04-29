@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { request, escapeHtml, formatRelativeTime, initialsFor } from '../utils/api';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -11,6 +12,13 @@ export default function HomePage() {
     if (!authCurrentUser) return;
 
     let currentUser = authCurrentUser;
+    const toastContainer = document.getElementById("toast-container");
+    const hubState = {
+      invites: [],
+      leaderTeams: [],
+      memberTeams: [],
+      tasks: []
+    };
 
     // We'll wrap all the logic from home.js here
     async function request(url, options = {}) {
@@ -23,6 +31,21 @@ export default function HomePage() {
   try { payload = await response.json(); } catch { payload = {}; }
   if (!response.ok) throw new Error(payload.error || "Request failed.");
   return payload;
+}
+
+function showToast(message, type = "success") {
+  if (!toastContainer) {
+    return;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("toast-exit");
+    setTimeout(() => toast.remove(), 280);
+  }, 2800);
 }
 
 function escapeHtml(value) {
@@ -247,6 +270,64 @@ function buildProjectStats(projects, tasks) {
   ];
 }
 
+function renderHubOverview() {
+  const allProjects = [...hubState.leaderTeams, ...hubState.memberTeams];
+  const completedTasks = hubState.tasks.filter((task) => isCompletedTask(task)).length;
+  const activeTasks = hubState.tasks.filter((task) => !isCompletedTask(task)).length;
+
+  const metricMap = {
+    "hub-stat-workspaces": allProjects.length,
+    "hub-stat-led": hubState.leaderTeams.length,
+    "hub-stat-collabs": hubState.memberTeams.length,
+    "hub-stat-completed": completedTasks
+  };
+
+  Object.entries(metricMap).forEach(([id, value]) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = String(value);
+    }
+  });
+
+  const focusSummary = document.getElementById("hub-focus-summary");
+  if (focusSummary) {
+    focusSummary.textContent = allProjects.length === 0
+      ? "Launch your first workspace to activate the full command center."
+      : `${activeTasks} active task${activeTasks === 1 ? "" : "s"} moving across ${allProjects.length} workspace${allProjects.length === 1 ? "" : "s"}.`;
+  }
+
+  const inviteSummary = document.getElementById("hub-invite-summary");
+  if (inviteSummary) {
+    inviteSummary.textContent = hubState.invites.length > 0
+      ? `${hubState.invites.length} pending invite${hubState.invites.length === 1 ? "" : "s"} ready for review.`
+      : "No pending invites right now.";
+  }
+
+  const leaderSectionCopy = document.getElementById("leader-section-copy");
+  if (leaderSectionCopy) {
+    leaderSectionCopy.textContent = hubState.leaderTeams.length === 0
+      ? "Create a workspace to start assigning work, inviting teammates, and tracking momentum."
+      : `${hubState.leaderTeams.length} workspace${hubState.leaderTeams.length === 1 ? "" : "s"} where you own the flow and final delivery.`;
+  }
+
+  const memberSectionCopy = document.getElementById("member-section-copy");
+  if (memberSectionCopy) {
+    memberSectionCopy.textContent = hubState.memberTeams.length === 0
+      ? "Shared workspaces you join from invites will appear here."
+      : `${hubState.memberTeams.length} workspace${hubState.memberTeams.length === 1 ? "" : "s"} where you're contributing alongside the team.`;
+  }
+
+  const openInvitesBtn = document.getElementById("hub-open-invites-btn");
+  if (openInvitesBtn) {
+    if (hubState.invites.length > 0) {
+      openInvitesBtn.hidden = false;
+      openInvitesBtn.textContent = `Review Invites (${hubState.invites.length})`;
+    } else {
+      openInvitesBtn.hidden = true;
+    }
+  }
+}
+
 function renderProfileStats(projects, tasks) {
   const container = document.getElementById("p-stats");
   if (!container) {
@@ -346,8 +427,16 @@ function renderProjectContributions(projects, tasks) {
       </div>
 
       <div class="contribution-card-stats">
-        <span class="contribution-card-ratio">${escapeHtml(completedByUser)} / ${escapeHtml(totalTasks)} tasks completed</span>
-        <span class="contribution-card-percentage">${escapeHtml(contributionPercentage)}%</span>
+        <span class="contribution-card-ratio">
+          <strong class="contribution-ratio-value">${escapeHtml(completedByUser)}</strong>
+          <span class="contribution-ratio-separator">/</span>
+          <strong class="contribution-ratio-value">${escapeHtml(totalTasks)}</strong>
+          <span class="contribution-ratio-copy">tasks completed</span>
+        </span>
+        <span class="contribution-card-percentage">
+          <strong class="contribution-percentage-value">${escapeHtml(contributionPercentage)}</strong>
+          <span class="contribution-percentage-symbol">%</span>
+        </span>
       </div>
 
       <div class="contribution-progress-track" aria-hidden="true">
@@ -503,6 +592,7 @@ async function checkInvitations() {
   try {
     const res = await request("/api/user/invitations", { method: "GET" });
     const invites = res.invitations || [];
+    hubState.invites = invites;
     const btn = document.getElementById("nav-invites-btn");
     const container = document.getElementById("invites-content");
     const modal = document.getElementById("invites-modal");
@@ -527,6 +617,7 @@ async function checkInvitations() {
       btn.style.display = "none";
       if(modal.open) modal.close();
     }
+    renderHubOverview();
   } catch(e) { }
 }
 
@@ -534,14 +625,15 @@ async function acceptInvite(teamId) {
   try {
     await request("/api/team/invitations/accept", { method: "POST", body: JSON.stringify({ teamId }) });
     window.location.reload();
-  } catch(e) { alert("Failed to accept"); }
+  } catch(e) { showToast("Failed to accept invite.", "error"); }
 }
 
 async function rejectInvite(teamId) {
   try {
     await request("/api/team/invitations/reject", { method: "POST", body: JSON.stringify({ teamId }) });
     checkInvitations();
-  } catch(e) { alert("Failed to reject"); }
+    showToast("Invite rejected.", "success");
+  } catch(e) { showToast("Failed to reject invite.", "error"); }
 }
 
 async function loadProjects() {
@@ -550,6 +642,8 @@ async function loadProjects() {
     const leaderTeams = Array.isArray(payload.leaderTeams) ? payload.leaderTeams : [];
     const memberTeams = Array.isArray(payload.memberTeams) ? payload.memberTeams : [];
     const allProjects = [...leaderTeams, ...memberTeams];
+    hubState.leaderTeams = leaderTeams;
+    hubState.memberTeams = memberTeams;
 
     const leaderGrid = document.getElementById("leader-grid");
     const memberGrid = document.getElementById("member-grid");
@@ -557,9 +651,9 @@ async function loadProjects() {
     if (leaderTeams.length === 0) {
       leaderGrid.innerHTML = `
         <div class="empty-state">
-          <h4 class="empty-state-title">No enterprise projects</h4>
-          <p class="empty-state-desc">You haven't initialized any workspace environments.</p>
-          <button onclick="document.getElementById('create-project-modal').showModal()" class="btn btn-primary">+ Initialize Workspace</button>
+          <h4 class="empty-state-title">No workspaces created yet</h4>
+          <p class="empty-state-desc">Start a new workspace to organize tasks, teammates, and momentum in one place.</p>
+          <button onclick="document.getElementById('create-project-modal').showModal()" class="btn btn-primary">+ Create Workspace</button>
         </div>`;
     } else {
       leaderGrid.innerHTML = leaderTeams.map((team) => generateCard(team, true)).join("");
@@ -568,18 +662,20 @@ async function loadProjects() {
     if (memberTeams.length === 0) {
       memberGrid.innerHTML = `
         <div class="empty-state">
-          <h4 class="empty-state-title">No collaborations joined</h4>
-          <p class="empty-state-desc">Wait for an invite or create a workspace of your own.</p>
+          <h4 class="empty-state-title">No shared workspaces yet</h4>
+          <p class="empty-state-desc">Accept an invite from a teammate or launch your own workspace to get started.</p>
         </div>`;
     } else {
       memberGrid.innerHTML = memberTeams.map((team) => generateCard(team, false)).join("");
     }
 
     const allTasks = await loadAllTasksForProjects(allProjects);
+    hubState.tasks = allTasks;
     renderProfileStats(allProjects, allTasks);
     renderProjectInvolvement(allProjects);
     renderProjectContributions(allProjects, allTasks);
     renderActivity(allProjects, allTasks, currentUser);
+    renderHubOverview();
   } catch (error) {
     console.error("Failed to load projects", error);
     const crashView = document.createElement("div");
@@ -635,8 +731,9 @@ async function logout() {
         document.getElementById("cp-name").value = "";
         document.getElementById("cp-title").value = "";
         await loadProjects();
+        showToast("Workspace created.", "success");
       } catch (error) {
-        alert("Failed to create workspace. " + error.message);
+        showToast("Failed to create workspace. " + error.message, "error");
       }
     });
   }
@@ -688,9 +785,8 @@ async function logout() {
 
   return (
     <>
-      
-
-
+  <div className="app-shell-theme">
+  <div className="toast-container" id="toast-container"></div>
   <div className="app-layout">
     
     
@@ -713,8 +809,9 @@ async function logout() {
       </nav>
       
       <div className="sidebar-footer">
+        <ThemeToggle className="sidebar-nav-item" />
         <span id="user-greeting" className="project-context-subtitle" >Loading...</span>
-        <button data-navigate="/settings.html" className="sidebar-nav-item">Edit Profile</button>
+        <button data-navigate="/settings.html" className="sidebar-nav-item">Profile Settings</button>
         <button data-action="logout" className="sidebar-nav-item">Sign Out</button>
       </div>
     </aside>
@@ -805,16 +902,69 @@ async function logout() {
         <div className="app-main-header" >
           <div>
             <h1 className="app-main-title">Workspace Hub</h1>
-            <p className="app-main-subtitle">Jump back into your projects or initialize a new enterprise initiative.</p>
+            <p className="app-main-subtitle">Jump back into your workspaces or launch a new one with the same command-center feel.</p>
           </div>
           <button onClick={() => document.getElementById('create-project-modal').showModal()} className="btn btn-primary">+ New Workspace</button>
         </div>
 
-        <h3 className="project-group-title">🔥 Projects You Lead</h3>
-        <div id="leader-grid" className="project-grid"></div>
+        <div className="hub-hero-grid">
+          <article className="hub-hero-card">
+            <span className="hub-kicker">Workspace Pulse</span>
+            <h2 className="hub-hero-title">Everything your team is touching, at a glance.</h2>
+            <p className="hub-hero-copy">Use the hub to jump into active workspaces, review fresh invites, and keep your profile aligned with the kind of work you actually want to own.</p>
+            <div className="hub-hero-actions">
+              <button onClick={() => document.getElementById('create-project-modal').showModal()} className="btn btn-primary">+ New Workspace</button>
+              <button id="hub-open-invites-btn" hidden={true} onClick={() => document.getElementById('invites-modal').showModal()} className="btn btn-secondary">Review Invites</button>
+            </div>
+            <div className="hub-status-row">
+              <span className="status-pill" id="hub-focus-summary">Syncing workspace activity...</span>
+              <span className="status-pill subtle" id="hub-invite-summary">Checking invites...</span>
+            </div>
+          </article>
 
-        <h3 className="project-group-title">🤝 Projects You've Joined</h3>
-        <div id="member-grid" className="project-grid"></div>
+          <div className="hub-metrics-grid">
+            <article className="hub-metric-card">
+              <span className="hub-metric-label">Total Workspaces</span>
+              <strong className="hub-metric-value" id="hub-stat-workspaces">0</strong>
+              <span className="hub-metric-note">All spaces you can access right now</span>
+            </article>
+            <article className="hub-metric-card">
+              <span className="hub-metric-label">Leading</span>
+              <strong className="hub-metric-value" id="hub-stat-led">0</strong>
+              <span className="hub-metric-note">Workspaces where you set the pace</span>
+            </article>
+            <article className="hub-metric-card">
+              <span className="hub-metric-label">Collaborating</span>
+              <strong className="hub-metric-value" id="hub-stat-collabs">0</strong>
+              <span className="hub-metric-note">Shared spaces you contribute to</span>
+            </article>
+            <article className="hub-metric-card">
+              <span className="hub-metric-label">Completed Tasks</span>
+              <strong className="hub-metric-value" id="hub-stat-completed">0</strong>
+              <span className="hub-metric-note">Finished work across your active spaces</span>
+            </article>
+          </div>
+        </div>
+
+        <section className="hub-section-shell">
+          <div className="hub-section-head">
+            <div>
+              <h3 className="project-group-title">Workspaces You Lead</h3>
+              <p id="leader-section-copy" className="hub-section-copy">Create a workspace to start assigning work, inviting teammates, and tracking momentum.</p>
+            </div>
+          </div>
+          <div id="leader-grid" className="project-grid"></div>
+        </section>
+
+        <section className="hub-section-shell">
+          <div className="hub-section-head">
+            <div>
+              <h3 className="project-group-title">Workspaces You Joined</h3>
+              <p id="member-section-copy" className="hub-section-copy">Shared workspaces you join from invites will appear here.</p>
+            </div>
+          </div>
+          <div id="member-grid" className="project-grid"></div>
+        </section>
       </section>
 
     </main>
@@ -824,7 +974,7 @@ async function logout() {
   <dialog id="create-project-modal">
     <div className="modal-shell">
     <h2 className="modal-title">Create Workspace</h2>
-    <p className="modal-subtitle">Initialize a new project environment for your team to collaborate.</p>
+    <p className="modal-subtitle">Set up a fresh collaboration space for your team, timeline, and deliverables.</p>
     
     <form id="create-project-form" className="modal-form">
       <div className="modal-field">
@@ -837,7 +987,7 @@ async function logout() {
       </div>
       <div className="modal-actions">
         <button type="button" className="btn btn-secondary" onClick={() => document.getElementById('create-project-modal').close()}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Initialize</button>
+        <button type="submit" className="btn btn-primary">Create Workspace</button>
       </div>
     </form>
     </div>
@@ -855,9 +1005,7 @@ async function logout() {
     </div>
   </dialog>
 
-  
-
-
+  </div>
     </>
   );
 }

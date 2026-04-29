@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { request, escapeHtml, formatFullDate, formatDate, normalizeTaskStatus, isArchivedTask, normalizeTask, initialsFor } from '../utils/api';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!authCurrentUser) return;
     let currentUser = authCurrentUser;
+    const toastContainer = document.getElementById("toast-container");
 
     // Use a custom mechanism for URL parameters inside the JS
     const originalURLSearchParams = URLSearchParams;
@@ -43,6 +45,52 @@ const CONTRIBUTION_PALETTE = [
   { end: "#ec4899", solid: "#f43f5e", start: "#fb7185" },
   { end: "#22c55e", solid: "#16a34a", start: "#84cc16" }
 ];
+let confirmAction = null;
+let confirmLabelDefault = "Confirm";
+
+function showToast(message, type = "success") {
+  if (!toastContainer) {
+    return;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("toast-exit");
+    setTimeout(() => toast.remove(), 280);
+  }, 2800);
+}
+
+function resetConfirmModalState() {
+  confirmAction = null;
+  confirmLabelDefault = "Confirm";
+  const confirmConfirmBtn = document.getElementById("confirm-confirm-btn");
+  if (confirmConfirmBtn) {
+    confirmConfirmBtn.disabled = false;
+    confirmConfirmBtn.textContent = confirmLabelDefault;
+  }
+}
+
+function openConfirmModal({ title, message, confirmLabel = "Confirm", onConfirm }) {
+  const confirmModal = document.getElementById("confirm-modal");
+  const confirmModalTitle = document.getElementById("confirm-modal-title");
+  const confirmModalMessage = document.getElementById("confirm-modal-message");
+  const confirmConfirmBtn = document.getElementById("confirm-confirm-btn");
+
+  if (!confirmModal || !confirmModalTitle || !confirmModalMessage || !confirmConfirmBtn) {
+    return;
+  }
+
+  confirmAction = onConfirm;
+  confirmLabelDefault = confirmLabel;
+  confirmModalTitle.textContent = title;
+  confirmModalMessage.textContent = message;
+  confirmConfirmBtn.disabled = false;
+  confirmConfirmBtn.textContent = confirmLabel;
+  confirmModal.showModal();
+}
 
 async function request(url, options = {}) {
   // Automatically inject teamId from URL into API requests
@@ -266,20 +314,21 @@ function syncTaskAssigneeOptions(selectedMemberIds = [], isEditMode = false, tas
 
   const isDisabled = isEditMode && taskStatus === "In Progress";
   
-  let html = `<div style="margin-bottom: 8px; font-size: 0.9em; color: var(--text-muted);">
-    ${isEditMode ? "" : "Leave empty to ✨ Auto-assign with AI."}
-    ${isDisabled ? "<strong style='color: var(--warning)'>Cannot change assignees while task is In Progress.</strong>" : ""}
+  let html = `<div class="assignee-helper">
+    ${isEditMode ? "" : '<span>Leave empty to let AI auto-assign the best fit.</span>'}
+    ${isDisabled ? '<strong class="assignee-helper-note">Assignees lock while a task is in progress.</strong>' : ""}
   </div>`;
   
-  html += `<div style="display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface);">`;
+  html += `<div class="assignee-option-list">`;
   
   members.forEach((member) => {
     const isChecked = selectedMemberIds.includes(member.userId) ? "checked" : "";
     const disabledAttr = isDisabled ? "disabled" : "";
+    const disabledClass = isDisabled ? " is-disabled" : "";
     html += `
-      <label style="display: flex; align-items: center; gap: 8px; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; opacity: ${isDisabled ? '0.6' : '1'};">
+      <label class="assignee-option${disabledClass}">
         <input type="checkbox" class="assignee-checkbox" value="${escapeHtml(member.userId)}" data-name="${escapeHtml(member.name)}" ${isChecked} ${disabledAttr} />
-        ${escapeHtml(member.name)}
+        <span>${escapeHtml(member.name)}</span>
       </label>
     `;
   });
@@ -324,6 +373,69 @@ function getCompletionWindowLabel(task) {
   }
 
   return `Movable for ${minutes}m`;
+}
+
+function renderWorkspaceOverview() {
+  const memberCount = Array.isArray(teamData?.members) ? teamData.members.length : 0;
+  const activeTasks = Array.isArray(tasksData) ? tasksData.filter((task) => !isArchivedTask(task)).length : 0;
+  const inProgressTasks = Array.isArray(tasksData) ? tasksData.filter((task) => task.status === "In Progress").length : 0;
+  const completedTasks = Array.isArray(tasksData) ? tasksData.filter((task) => task.status === "Done").length : 0;
+  const archivedCount = Array.isArray(archivedTasksData) ? archivedTasksData.length : 0;
+  const messageCount = Array.isArray(messagesData) ? messagesData.length : 0;
+  const workspaceName = teamData?.projectTitle || teamData?.name || "Workspace";
+
+  const valueMap = {
+    "workspace-overview-members": memberCount,
+    "workspace-overview-active": activeTasks,
+    "workspace-overview-progress": inProgressTasks,
+    "workspace-overview-completed": completedTasks + archivedCount
+  };
+
+  Object.entries(valueMap).forEach(([id, value]) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = String(value);
+    }
+  });
+
+  const overviewTitle = document.getElementById("workspace-overview-title");
+  if (overviewTitle) {
+    overviewTitle.textContent = `${workspaceName} is live`;
+  }
+
+  const overviewCopy = document.getElementById("workspace-overview-copy");
+  if (overviewCopy) {
+    overviewCopy.textContent = `${memberCount} teammate${memberCount === 1 ? "" : "s"}, ${activeTasks} active task${activeTasks === 1 ? "" : "s"}, and ${messageCount} message${messageCount === 1 ? "" : "s"} are currently in the loop.`;
+  }
+
+  const overviewRole = document.getElementById("workspace-overview-role");
+  if (overviewRole) {
+    overviewRole.textContent = isCurrentUserLeader() ? "Leader controls enabled" : "Assigned-task mode";
+  }
+
+  const overviewRhythm = document.getElementById("workspace-overview-rhythm");
+  if (overviewRhythm) {
+    overviewRhythm.textContent = archivedCount > 0
+      ? `${archivedCount} archived task${archivedCount === 1 ? "" : "s"} ready for review`
+      : "Chat refreshes every 5 seconds";
+  }
+
+  const boardSubtitle = document.getElementById("board-subtitle");
+  if (boardSubtitle) {
+    boardSubtitle.textContent = `${workspaceName} • ${memberCount} member${memberCount === 1 ? "" : "s"} • ${activeTasks} active task${activeTasks === 1 ? "" : "s"}`;
+  }
+
+  const chatSubtitle = document.getElementById("chat-subtitle");
+  if (chatSubtitle) {
+    chatSubtitle.textContent = `${messageCount} message${messageCount === 1 ? "" : "s"} in the workspace channel`;
+  }
+
+  const chatPanelCopy = document.getElementById("chat-panel-copy");
+  if (chatPanelCopy) {
+    chatPanelCopy.textContent = messageCount === 0
+      ? "Start the conversation with a quick update, blocker, or handoff."
+      : "Quick coordination, mentions, and project notes live here.";
+  }
 }
 
 function updateContributionSourceState(source, status) {
@@ -616,13 +728,14 @@ async function loadTeam() {
     const ctxMeta = document.getElementById("context-team-meta");
     if(ctxName) ctxName.textContent = teamData?.projectTitle || teamData?.name || "Workspace";
     if(ctxMeta) ctxMeta.textContent = teamData?.name ? `${teamData.name} • ${teamData.members?.length || 0} members` : "Connected";
+    renderWorkspaceOverview();
 
     if(!teamList) return;
     
     if(!teamData || !teamData.members || teamData.members.length === 0) {
       teamList.innerHTML = `
-        <div class="team-empty">You aren't in a team yet.</div>
-        <button class="btn btn-secondary wide-button" onclick="document.getElementById('create-team-modal').showModal()">Create a Squad</button>
+        <div class="team-empty">You aren't in a workspace yet.</div>
+        <button class="btn btn-secondary wide-button" onclick="document.getElementById('create-team-modal').showModal()">Create Workspace</button>
       `;
       const invitePanel = document.getElementById("invite-panel");
       if (invitePanel) {
@@ -682,6 +795,7 @@ async function loadTasks() {
       ? payload.tasks.map(normalizeTask).filter(Boolean)
       : [];
     renderTasks();
+    renderWorkspaceOverview();
     updateContributionSourceState("tasks", "success");
   } catch(e) {
     console.error("Failed to load tasks");
@@ -697,6 +811,7 @@ async function loadArchivedTasks() {
       ? payload.tasks.map(normalizeTask).filter(Boolean)
       : [];
     renderArchivedTasks();
+    renderWorkspaceOverview();
     updateContributionSourceState("archived", "success");
   } catch (e) {
     console.error("Failed to load archived tasks");
@@ -863,7 +978,7 @@ function renderArchivedTasks() {
 window.updateTaskStatus = async (taskId, newStatus) => {
   const task = findTaskById(taskId);
   if (!canMoveTask(task)) {
-    alert(MOVE_PERMISSION_MESSAGE);
+    showToast(MOVE_PERMISSION_MESSAGE, "error");
     return;
   }
 
@@ -871,40 +986,52 @@ window.updateTaskStatus = async (taskId, newStatus) => {
     await request("/api/tasks/" + taskId, { method: "PUT", body: JSON.stringify({ status: newStatus }) });
     loadTasks();
     loadArchivedTasks();
-  } catch(e) { alert("Failed to move task or unauthorized. " + e.message); }
+  } catch(e) { showToast("Failed to move task. " + e.message, "error"); }
 };
 
 window.deleteTask = async (taskId) => {
   const task = findTaskById(taskId);
   if (!canDeleteTask(task)) {
-    alert(DELETE_PERMISSION_MESSAGE);
+    showToast(DELETE_PERMISSION_MESSAGE, "error");
     return;
   }
 
-  if(!confirm("Sure you want to delete this task?")) return;
-  try {
-    await request("/api/tasks/" + taskId, { method: "DELETE" });
-    tasksData = tasksData.filter((task) => task.id !== taskId);
-    renderTasks();
-    loadTasks();
-    loadArchivedTasks();
-  } catch(e) { alert("Failed to delete task. " + e.message); }
+  openConfirmModal({
+    title: "Delete this task?",
+    message: "This will remove the task from the board for everyone in the workspace.",
+    confirmLabel: "Delete Task",
+    onConfirm: async () => {
+      try {
+        await request("/api/tasks/" + taskId, { method: "DELETE" });
+        tasksData = tasksData.filter((task) => task.id !== taskId);
+        renderTasks();
+        loadTasks();
+        loadArchivedTasks();
+      } catch(e) { showToast("Failed to delete task. " + e.message, "error"); }
+    }
+  });
 };
 
 window.deleteArchivedTask = async (taskId) => {
   const task = findTaskById(taskId);
   if (!canDeleteTask(task)) {
-    alert(DELETE_PERMISSION_MESSAGE);
+    showToast(DELETE_PERMISSION_MESSAGE, "error");
     return;
   }
 
-  if(!confirm("Delete this archived task permanently?")) return;
-  try {
-    await request("/api/tasks/" + taskId, { method: "DELETE" });
-    archivedTasksData = archivedTasksData.filter((task) => task.id !== taskId);
-    renderArchivedTasks();
-    loadArchivedTasks();
-  } catch(e) { alert("Failed to delete archived task. " + e.message); }
+  openConfirmModal({
+    title: "Delete this archived task?",
+    message: "This permanently removes the task from the archive and cannot be undone.",
+    confirmLabel: "Delete Forever",
+    onConfirm: async () => {
+      try {
+        await request("/api/tasks/" + taskId, { method: "DELETE" });
+        archivedTasksData = archivedTasksData.filter((task) => task.id !== taskId);
+        renderArchivedTasks();
+        loadArchivedTasks();
+      } catch(e) { showToast("Failed to delete archived task. " + e.message, "error"); }
+    }
+  });
 };
 
 const kanbanBoard = document.querySelector(".kanban-board");
@@ -971,7 +1098,7 @@ document.getElementById("create-team-form").addEventListener("submit", async (e)
   try {
     await request("/api/team", { method: "POST", body: JSON.stringify({ name }) });
     window.location.reload();
-  } catch(err) { alert("Failed to create team. " + err.message); }
+  } catch(err) { showToast("Failed to create workspace. " + err.message, "error"); }
 });
 
 const inviteForm = document.getElementById("invite-form");
@@ -982,8 +1109,8 @@ if(inviteForm) {
     try {
       await request("/api/team/members", { method: "POST", body: JSON.stringify({ email }) });
       document.getElementById("invite-email").value = "";
-      alert("Invite sent!");
-    } catch(err) { alert("Failed to invite. " + err.message); }
+      showToast("Invite sent.", "success");
+    } catch(err) { showToast("Failed to invite. " + err.message, "error"); }
   });
 }
 
@@ -1007,6 +1134,9 @@ const closeTaskBtn = document.getElementById("close-task-modal");
 const taskForm = document.getElementById("task-form");
 const taskModalTitle = document.getElementById("task-modal-title");
 const taskSubmitBtn = document.getElementById("task-submit-btn");
+const confirmModal = document.getElementById("confirm-modal");
+const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+const confirmConfirmBtn = document.getElementById("confirm-confirm-btn");
 
 function resetTaskModalState() {
   taskModalMode = "create";
@@ -1034,7 +1164,7 @@ function openTaskModal(mode = "create", task = null) {
 
   if (mode === "edit") {
     if (!task || !canEditTask(task)) {
-      alert(EDIT_PERMISSION_MESSAGE);
+      showToast(EDIT_PERMISSION_MESSAGE, "error");
       return;
     }
 
@@ -1064,7 +1194,7 @@ function openTaskModal(mode = "create", task = null) {
 if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
   addTaskBtn.addEventListener("click", () => {
     if (!isCurrentUserLeader()) {
-      alert(CREATE_PERMISSION_MESSAGE);
+      showToast(CREATE_PERMISSION_MESSAGE, "error");
       return;
     }
 
@@ -1084,17 +1214,17 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
 
     if (isEditMode) {
       if (!canEditTask(editingTask)) {
-        alert(EDIT_PERMISSION_MESSAGE);
+        showToast(EDIT_PERMISSION_MESSAGE, "error");
         return;
       }
     } else if (!isCurrentUserLeader()) {
-      alert(CREATE_PERMISSION_MESSAGE);
+      showToast(CREATE_PERMISSION_MESSAGE, "error");
       return;
     }
 
     if(!title) {
       if(titleInput) titleInput.focus();
-      alert("Task title is required.");
+      showToast("Task title is required.", "error");
       return;
     }
 
@@ -1135,8 +1265,9 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
       }
       loadTasks();
       loadArchivedTasks();
+      showToast(isEditMode ? "Task updated." : "Task created.", "success");
     } catch(err) {
-      alert(`Failed to ${isEditMode ? "save" : "create"} task. ` + err.message);
+      showToast(`Failed to ${isEditMode ? "save" : "create"} task. ` + err.message, "error");
     } finally {
       if(taskSubmitBtn) {
         taskSubmitBtn.disabled = false;
@@ -1144,6 +1275,26 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
       }
     }
   });
+}
+
+if (confirmModal && confirmCancelBtn && confirmConfirmBtn) {
+  confirmCancelBtn.onclick = () => confirmModal.close();
+  confirmConfirmBtn.onclick = async () => {
+    if (!confirmAction) {
+      confirmModal.close();
+      return;
+    }
+
+    const actionToRun = confirmAction;
+    confirmConfirmBtn.disabled = true;
+
+    try {
+      await actionToRun();
+    } finally {
+      confirmModal.close();
+    }
+  };
+  confirmModal.onclose = resetConfirmModalState;
 }
 
 // Chat logic
@@ -1163,6 +1314,7 @@ function renderMessages() {
   
   if(messagesData.length === 0) {
     container.innerHTML = `<div class="chat-empty">It's quiet here.</div>`;
+    renderWorkspaceOverview();
     return;
   }
   
@@ -1177,6 +1329,7 @@ function renderMessages() {
   `).join('');
   
   container.scrollTop = container.scrollHeight;
+  renderWorkspaceOverview();
 }
 
 const chatForm = document.getElementById("chat-form");
@@ -1264,6 +1417,7 @@ bootstrap();
 
   return (
     <div className="dashboard-body">
+      <div className="toast-container" id="toast-container"></div>
       
 
   <div className="app-layout">
@@ -1297,8 +1451,9 @@ bootstrap();
       </nav>
 
       <div className="sidebar-footer">
+        <ThemeToggle className="sidebar-nav-item" />
         <span id="nav-user-chip" className="project-context-subtitle" ></span>
-        <button data-navigate="/home.html" className="sidebar-nav-item">Back to Home</button>
+        <button data-navigate="/home.html" className="sidebar-nav-item">Back to Hub</button>
         <button id="nav-logout" className="sidebar-nav-item">Log Out</button>
       </div>
     </aside>
@@ -1311,6 +1466,42 @@ bootstrap();
         <div className="app-main-header">
           <h1 className="app-main-title">Team Dashboard</h1>
           <p className="app-main-subtitle" id="board-subtitle">Project Overview</p>
+        </div>
+
+        <div className="dashboard-command-grid">
+          <article className="dashboard-command-card dashboard-command-feature">
+            <span className="dashboard-command-kicker">Workspace Pulse</span>
+            <h2 id="workspace-overview-title" className="dashboard-command-title">Syncing workspace...</h2>
+            <p id="workspace-overview-copy" className="dashboard-command-copy">Pulling the latest task, member, and chat activity.</p>
+            <div className="dashboard-status-row">
+              <span id="workspace-overview-role" className="status-pill">Loading role...</span>
+              <span id="workspace-overview-rhythm" className="status-pill subtle">Checking archive state...</span>
+            </div>
+          </article>
+
+          <article className="dashboard-command-card">
+            <span className="dashboard-command-label">Members</span>
+            <strong id="workspace-overview-members" className="dashboard-command-value">0</strong>
+            <span className="dashboard-command-note">Connected to this workspace</span>
+          </article>
+
+          <article className="dashboard-command-card">
+            <span className="dashboard-command-label">Active Tasks</span>
+            <strong id="workspace-overview-active" className="dashboard-command-value">0</strong>
+            <span className="dashboard-command-note">Total work currently on the board</span>
+          </article>
+
+          <article className="dashboard-command-card">
+            <span className="dashboard-command-label">In Progress</span>
+            <strong id="workspace-overview-progress" className="dashboard-command-value">0</strong>
+            <span className="dashboard-command-note">Tasks being actively pushed forward</span>
+          </article>
+
+          <article className="dashboard-command-card">
+            <span className="dashboard-command-label">Completed + Archived</span>
+            <strong id="workspace-overview-completed" className="dashboard-command-value">0</strong>
+            <span className="dashboard-command-note">Visible delivery history for the team</span>
+          </article>
         </div>
         
         <div className="board-header">
@@ -1384,6 +1575,13 @@ bootstrap();
         </div>
         
         <div className="dashboard-panel" >
+          <div className="chat-panel-header">
+            <div>
+              <h2 className="board-title">Workspace Channel</h2>
+              <p id="chat-panel-copy" className="chat-panel-copy">Live project conversation and quick mentions.</p>
+            </div>
+            <span className="status-pill subtle">5s refresh</span>
+          </div>
           <div id="chat-container" className="chat-box" ></div>
           <form id="chat-form" >
             <div >
@@ -1426,7 +1624,7 @@ bootstrap();
   <dialog id="analytics-modal">
     <div className="modal-shell">
     <div className="modal-header">
-      <h3 className="modal-title">Squad Analytics</h3>
+      <h3 className="modal-title">Workspace Analytics</h3>
       <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('analytics-modal').close()}>Close</button>
     </div>
     <div id="analytics-content">
@@ -1439,17 +1637,30 @@ bootstrap();
   
   <dialog id="create-team-modal">
     <div className="modal-shell">
-    <h3 className="modal-title">Start a new squad</h3>
+    <h3 className="modal-title">Create a workspace</h3>
     <form id="create-team-form" className="modal-form">
       <div className="modal-field">
-        <label>Team Name</label>
+        <label>Workspace Name</label>
         <input className="modal-input" type="text" id="new-team-name" required={true} />
       </div>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('create-team-modal').close()}>Cancel</button>
-        <button type="submit" className="btn btn-primary">Create</button>
+        <button type="submit" className="btn btn-primary">Create Workspace</button>
       </div>
     </form>
+    </div>
+  </dialog>
+
+  <dialog id="confirm-modal">
+    <div className="modal-shell">
+      <div className="modal-header">
+        <h3 id="confirm-modal-title" className="modal-title">Confirm action</h3>
+      </div>
+      <p id="confirm-modal-message" className="confirm-copy">Please confirm before continuing.</p>
+      <div className="modal-actions confirm-actions">
+        <button type="button" id="confirm-cancel-btn" className="btn btn-ghost">Cancel</button>
+        <button type="button" id="confirm-confirm-btn" className="btn btn-danger">Confirm</button>
+      </div>
     </div>
   </dialog>
 

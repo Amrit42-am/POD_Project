@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import CollabNodesBackground from '../components/CollabNodesBackground';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -52,178 +54,6 @@ export default function LandingPage() {
         revealTargets.forEach((target) => sectionObserver.observe(target));
       }
 
-      const landingCanvas = landingRoot.querySelector(".landing-wave-canvas");
-
-      if (landingCanvas instanceof HTMLCanvasElement) {
-        const context = landingCanvas.getContext("2d");
-
-        if (context) {
-          let frameId = 0;
-          let renderWidth = 0;
-          let renderHeight = 0;
-          let dpr = 1;
-          const smoothedPointer = { x: pointerState.x, y: pointerState.y };
-          const waveBands = Array.from({ length: 8 }, (_, index) => ({
-            progress: 0.2 + index * 0.092,
-            amplitude: 0.004 + (1 - index / 7) * 0.0038,
-            speed: 0.26 + index * 0.055,
-            phase: index * 0.68,
-            stroke: `rgba(196, 216, 255, ${0.14 - index * 0.01})`,
-            glow: `rgba(${index % 2 === 0 ? "120, 136, 255" : "96, 184, 255"}, ${0.08 - index * 0.005})`,
-            fill: `rgba(${index % 2 === 0 ? "88, 106, 210" : "72, 132, 214"}, ${0.05 - index * 0.004})`,
-            width: 0.95 + (1 - index / 7) * 0.55
-          }));
-
-          const resizeScene = () => {
-            renderWidth = Math.max(1, Math.round(landingRoot.clientWidth));
-            renderHeight = Math.max(1, Math.round(landingRoot.scrollHeight));
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
-            landingCanvas.width = Math.round(renderWidth * dpr);
-            landingCanvas.height = Math.round(renderHeight * dpr);
-            landingCanvas.style.width = `${renderWidth}px`;
-            landingCanvas.style.height = `${renderHeight}px`;
-            context.setTransform(dpr, 0, 0, dpr, 0, 0);
-          };
-
-          const buildWaveGeometry = (band, timeSeconds) => {
-            const baseY =
-              renderHeight * band.progress +
-              Math.sin(timeSeconds * band.speed * 0.55 + band.phase) * renderHeight * 0.0035;
-            const step = Math.max(44, Math.round(renderWidth / 18));
-            const pointerBandFalloff = Math.exp(-Math.pow(band.progress - smoothedPointer.y, 2) * 24);
-            const points = [];
-
-            for (let x = -step; x <= renderWidth + step; x += step) {
-              const normalizedX = x / renderWidth;
-              const cursorDistance = normalizedX - smoothedPointer.x;
-              const rippleFalloff = Math.exp(-cursorDistance * cursorDistance * 16);
-              const swell =
-                Math.sin(normalizedX * 7.2 - timeSeconds * (band.speed * 1.55) + band.phase) *
-                  renderHeight *
-                  band.amplitude +
-                Math.cos(normalizedX * 2.8 + timeSeconds * 0.52 + band.phase * 1.25) *
-                  renderHeight *
-                  band.amplitude *
-                  0.48;
-              const pointerRipple =
-                Math.sin(cursorDistance * 18 - timeSeconds * 3.6 + band.phase) *
-                renderHeight *
-                band.amplitude *
-                1.6 *
-                rippleFalloff *
-                pointerBandFalloff *
-                (pointerState.active ? 0.85 : 0.12);
-              points.push({ x, y: baseY + swell + pointerRipple });
-            }
-
-            return points;
-          };
-
-          const buildWaveStrokePath = (points) => {
-            const path = new Path2D();
-            if (!points.length) return path;
-            path.moveTo(points[0].x, points[0].y);
-
-            for (let i = 1; i < points.length; i += 1) {
-              const current = points[i];
-              const previous = points[i - 1];
-              const midX = (previous.x + current.x) * 0.5;
-              const midY = (previous.y + current.y) * 0.5;
-              path.quadraticCurveTo(previous.x, previous.y, midX, midY);
-            }
-
-            const last = points[points.length - 1];
-            path.lineTo(last.x, last.y);
-            return path;
-          };
-
-          const buildWaveFillPath = (points) => {
-            const path = buildWaveStrokePath(points);
-            if (!points.length) return path;
-            const first = points[0];
-            const last = points[points.length - 1];
-            path.lineTo(last.x, renderHeight + 80);
-            path.lineTo(first.x, renderHeight + 80);
-            path.closePath();
-            return path;
-          };
-
-          const renderScene = (timeMs) => {
-            const timeSeconds = timeMs * 0.001;
-            smoothedPointer.x += (pointerState.x - smoothedPointer.x) * 0.05;
-            smoothedPointer.y += (pointerState.y - smoothedPointer.y) * 0.05;
-
-            context.clearRect(0, 0, renderWidth, renderHeight);
-            waveBands.forEach((band, index) => {
-              const wavePoints = buildWaveGeometry(band, timeSeconds + index * 0.08);
-              const strokePath = buildWaveStrokePath(wavePoints);
-
-              if (index >= 3) {
-                const fillPath = buildWaveFillPath(wavePoints);
-                const fillGradient = context.createLinearGradient(0, renderHeight * band.progress, 0, renderHeight + 80);
-                fillGradient.addColorStop(0, band.fill);
-                fillGradient.addColorStop(1, "rgba(9, 18, 38, 0)");
-                context.save();
-                context.fillStyle = fillGradient;
-                context.fill(fillPath);
-                context.restore();
-              }
-
-              context.save();
-              context.strokeStyle = band.glow;
-              context.lineWidth = band.width * 2.2;
-              context.stroke(strokePath);
-              context.restore();
-
-              context.save();
-              const lineGradient = context.createLinearGradient(0, renderHeight * band.progress, renderWidth, renderHeight * (band.progress + 0.04));
-              lineGradient.addColorStop(0, band.stroke);
-              lineGradient.addColorStop(0.52, "rgba(222, 234, 255, 0.2)");
-              lineGradient.addColorStop(1, band.stroke);
-              context.strokeStyle = lineGradient;
-              context.lineWidth = band.width;
-              context.stroke(strokePath);
-              context.restore();
-            });
-
-            const pointerGlow = context.createRadialGradient(
-              smoothedPointer.x * renderWidth,
-              smoothedPointer.y * renderHeight,
-              0,
-              smoothedPointer.x * renderWidth,
-              smoothedPointer.y * renderHeight,
-              Math.max(renderWidth, renderHeight) * 0.12
-            );
-            pointerGlow.addColorStop(0, "rgba(184, 219, 255, 0.08)");
-            pointerGlow.addColorStop(0.42, "rgba(126, 158, 255, 0.035)");
-            pointerGlow.addColorStop(1, "rgba(126, 158, 255, 0)");
-            context.fillStyle = pointerGlow;
-            context.fillRect(0, 0, renderWidth, renderHeight);
-
-            frameId = window.requestAnimationFrame(renderScene);
-          };
-
-          resizeScene();
-          frameId = window.requestAnimationFrame(renderScene);
-
-          const resizeObserver =
-            typeof ResizeObserver !== "undefined"
-              ? new ResizeObserver(() => resizeScene())
-              : null;
-
-          if (resizeObserver) {
-            resizeObserver.observe(landingRoot);
-          } else {
-            window.addEventListener("resize", resizeScene);
-          }
-
-          disposeLandingScene = () => {
-            window.cancelAnimationFrame(frameId);
-            resizeObserver?.disconnect();
-            if (!resizeObserver) window.removeEventListener("resize", resizeScene);
-          };
-        }
-      }
     }
 
     if (
@@ -599,7 +429,7 @@ export default function LandingPage() {
         <span className="landing-cursor-core"></span>
       </div>
       <div className="landing-atmosphere" aria-hidden="true">
-        <canvas className="landing-wave-canvas"></canvas>
+        <CollabNodesBackground />
       </div>
       <header className="site-header">
         <div className="shell header-shell">
@@ -614,6 +444,7 @@ export default function LandingPage() {
             <a href="#testimonials">Customers</a>
           </nav>
           <div className="header-actions">
+            <ThemeToggle />
             <a className="user-chip auth-only" id="nav-user-chip" href="/home" hidden={true}></a>
             <button className="btn btn-ghost guest-only" data-open-auth="login">Log In</button>
             <button className="btn btn-primary guest-only" data-open-auth="register">Deploy Workspace</button>
@@ -764,8 +595,8 @@ export default function LandingPage() {
         <div className="auth-shell">
           <button className="close-dialog" id="close-auth-dialog">×</button>
           <div className="auth-header">
-            <h2>Authentication</h2>
-            <p>Access your workspace.</p>
+            <h2>Welcome Back</h2>
+            <p>Sign in or create an account to open your workspace.</p>
           </div>
           <div className="auth-tabs">
             <button className="auth-tab is-active" id="register-tab" data-auth-tab="register">Register</button>
@@ -784,7 +615,7 @@ export default function LandingPage() {
                   <button className="input-action" type="button" data-toggle-password="register-password">Show</button>
                 </div>
               </label>
-              <button className="btn btn-primary wide-button" type="submit">Initialize Account</button>
+              <button className="btn btn-primary wide-button" type="submit">Create Account</button>
             </form>
           </section>
           <section className="auth-panel" id="login-panel" hidden={true}>
@@ -797,7 +628,7 @@ export default function LandingPage() {
                   <button className="input-action" type="button" data-toggle-password="login-password">Show</button>
                 </div>
               </label>
-              <button className="btn btn-primary wide-button" type="submit">Authenticate</button>
+              <button className="btn btn-primary wide-button" type="submit">Continue to Workspace</button>
             </form>
           </section>
         </div>
