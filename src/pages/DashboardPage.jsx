@@ -1188,6 +1188,15 @@ function resetTaskModalState() {
     taskForm.reset();
   }
 
+  const titleInput = document.getElementById("task-title");
+  const err = document.getElementById("task-title-error");
+  if (titleInput) {
+    titleInput.classList.remove('is-error', 'is-valid');
+  }
+  if (err) {
+    err.classList.remove('visible');
+  }
+
   syncTaskAssigneeOptions([], false);
 }
 
@@ -1235,6 +1244,25 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
     openTaskModal("create");
   });
   closeTaskBtn.addEventListener("click", () => taskModal.close());
+  
+  // Real-time validation
+  const titleInput = document.getElementById("task-title");
+  if (titleInput) {
+    titleInput.addEventListener("input", (e) => {
+      const val = e.target.value.trim();
+      const err = document.getElementById("task-title-error");
+      if (val) {
+        e.target.classList.remove('is-error');
+        e.target.classList.add('is-valid');
+        err?.classList.remove('visible');
+      } else {
+        e.target.classList.remove('is-valid');
+        e.target.classList.add('is-error');
+        err?.classList.add('visible');
+      }
+    });
+  }
+
   taskModal.addEventListener("close", resetTaskModalState);
   
   taskForm.addEventListener("submit", async (e) => {
@@ -1257,8 +1285,11 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
     }
 
     if(!title) {
-      if(titleInput) titleInput.focus();
-      showToast("Task title is required.", "error");
+      if(titleInput) {
+        titleInput.focus();
+        titleInput.classList.add('is-error');
+        document.getElementById('task-title-error')?.classList.add('visible');
+      }
       return;
     }
 
@@ -1359,15 +1390,38 @@ function renderMessages() {
     return;
   }
   
-  container.innerHTML = messagesData.map(msg => `
-    <div class="chat-message ${msg.userId === currentUser.id ? 'is-me' : ''}">
-      <div class="chat-message-head">
-        <strong>${escapeHtml(msg.userName || msg.name || 'Unknown')}</strong>
-        <span class="chat-message-time">${formatDate(msg.createdAt || msg.timestamp)}</span>
+  let html = '';
+  let lastDateStr = null;
+
+  messagesData.forEach(msg => {
+    const rawDate = msg.createdAt || msg.timestamp;
+    const msgDate = new Date(rawDate);
+    
+    let dateStr = "Unknown Date";
+    if (!Number.isNaN(msgDate.getTime())) {
+      dateStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+      const todayStr = new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+      if (dateStr === todayStr) dateStr = "Today";
+    }
+
+    if (dateStr !== lastDateStr) {
+      html += `<div class="chat-date-separator">${escapeHtml(dateStr)}</div>`;
+      lastDateStr = dateStr;
+    }
+
+    html += `
+      <div class="chat-message ${msg.userId === currentUser.id ? 'is-me' : ''}">
+        <div class="chat-message-head">
+          <strong>${escapeHtml(msg.userName || msg.name || 'Unknown')}</strong>
+          <span class="chat-message-time">${formatDate(rawDate)}</span>
+        </div>
+        <div>${escapeHtml(msg.text || msg.content || '')}</div>
       </div>
-      <div>${escapeHtml(msg.text || msg.content || '')}</div>
-    </div>
-  `).join('');
+    `;
+  });
+
+  container.innerHTML = html;
+
   
   container.scrollTop = container.scrollHeight;
   renderWorkspaceOverview();
@@ -1689,6 +1743,10 @@ bootstrap();
       <div className="modal-field">
         <label>What needs doing?</label>
         <input className="modal-input" type="text" id="task-title" required={true} />
+        <div id="task-title-error" className="modal-field-error">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Task title is required
+        </div>
       </div>
       <div className="modal-field">
         <label>Details</label>
@@ -1749,9 +1807,46 @@ bootstrap();
     </div>
   </dialog>
 
-  
+  {/* Command Palette (Cmd+K) */}
+  <div id="cmd-backdrop" className="cmd-backdrop" onClick={(e) => {
+    if (e.target.id === 'cmd-backdrop') e.target.classList.remove('is-open');
+  }}>
+    <div className="cmd-palette">
+      <div className="cmd-input-wrap">
+        <svg className="cmd-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmd-input" className="cmd-input" placeholder="Search tasks, teams, and members..." autoComplete="off" />
+      </div>
+      <div id="cmd-results" className="cmd-results">
+        <div className="cmd-section-label">Quick Actions</div>
+        <div className="cmd-item" onClick={() => { document.getElementById('cmd-backdrop').classList.remove('is-open'); document.getElementById('task-modal')?.showModal(); }}>
+          <div className="cmd-item-icon">➕</div>
+          <div className="cmd-item-text"><div className="cmd-item-name">Create new task</div></div>
+        </div>
+      </div>
+      <div className="cmd-footer">
+        <span className="cmd-shortcut"><kbd className="cmd-key">↑</kbd> <kbd className="cmd-key">↓</kbd> to navigate</span>
+        <span className="cmd-shortcut"><kbd className="cmd-key">Enter</kbd> to select</span>
+        <span className="cmd-shortcut"><kbd className="cmd-key">Esc</kbd> to close</span>
+      </div>
+    </div>
+  </div>
 
-  
+  <script dangerouslySetInnerHTML={{__html: `
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const backdrop = document.getElementById('cmd-backdrop');
+        if (backdrop) {
+          backdrop.classList.toggle('is-open');
+          if (backdrop.classList.contains('is-open')) {
+            setTimeout(() => document.getElementById('cmd-input')?.focus(), 50);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        document.getElementById('cmd-backdrop')?.classList.remove('is-open');
+      }
+    });
+  `}} />
 
     </div>
   );

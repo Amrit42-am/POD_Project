@@ -523,11 +523,28 @@ function renderActivity(projects, tasks, user) {
   `).join("");
 }
 
-function generateCard(team, isLeader) {
+function generateCard(team, isLeader, tasks = []) {
+  // Calculate progress
+  const teamTasks = tasks.filter(t => String(t.teamId) === String(team.id));
+  const total = teamTasks.length;
+  const completed = teamTasks.filter(t => normalizeTaskStatus(t.status) === 'Done').length;
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+
   return `
     <div class="project-card ${isLeader ? "p-leader" : ""}" data-team-id="${escapeHtml(team.id)}">
       <h4 class="p-title">${escapeHtml(team.projectTitle || "Untitled Project")}</h4>
       <div class="p-desc">Team: ${escapeHtml(team.name || "Workspace")} &bull; ${escapeHtml(team.memberCount)} members</div>
+      
+      <div class="p-progress">
+        <div class="p-progress-bar-wrap">
+          <div class="p-progress-bar-fill" style="width: ${pct}%"></div>
+        </div>
+        <div class="p-progress-label">
+          <span>Task Progress</span>
+          <span class="p-progress-pct">${total > 0 ? `${completed}/${total}` : 'No tasks'}</span>
+        </div>
+      </div>
+
       <div class="p-footer">
         <span class="p-role">${escapeHtml(team.role || "Member")}</span>
         <span class="arrow-icon">&rarr;</span>
@@ -648,6 +665,8 @@ async function loadProjects() {
     const leaderGrid = document.getElementById("leader-grid");
     const memberGrid = document.getElementById("member-grid");
 
+    const allTasks = await loadAllTasksForProjects(allProjects);
+    
     if (leaderTeams.length === 0) {
       leaderGrid.innerHTML = `
         <div class="empty-state">
@@ -656,7 +675,7 @@ async function loadProjects() {
           <button onclick="document.getElementById('create-project-modal').showModal()" class="btn btn-primary">+ Create Workspace</button>
         </div>`;
     } else {
-      leaderGrid.innerHTML = leaderTeams.map((team) => generateCard(team, true)).join("");
+      leaderGrid.innerHTML = leaderTeams.map((team) => generateCard(team, true, allTasks)).join("");
     }
 
     if (memberTeams.length === 0) {
@@ -666,10 +685,8 @@ async function loadProjects() {
           <p class="empty-state-desc">Accept an invite from a teammate or launch your own workspace to get started.</p>
         </div>`;
     } else {
-      memberGrid.innerHTML = memberTeams.map((team) => generateCard(team, false)).join("");
+      memberGrid.innerHTML = memberTeams.map((team) => generateCard(team, false, allTasks)).join("");
     }
-
-    const allTasks = await loadAllTasksForProjects(allProjects);
     hubState.tasks = allTasks;
     renderProfileStats(allProjects, allTasks);
     renderProjectInvolvement(allProjects);
@@ -1004,6 +1021,46 @@ async function logout() {
     </div>
     </div>
   </dialog>
+  {/* Command Palette (Cmd+K) */}
+  <div id="cmd-backdrop" className="cmd-backdrop" onClick={(e) => {
+    if (e.target.id === 'cmd-backdrop') e.target.classList.remove('is-open');
+  }}>
+    <div className="cmd-palette">
+      <div className="cmd-input-wrap">
+        <svg className="cmd-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmd-input" className="cmd-input" placeholder="Search tasks, teams, and members..." autoComplete="off" />
+      </div>
+      <div id="cmd-results" className="cmd-results">
+        <div className="cmd-section-label">Quick Actions</div>
+        <div className="cmd-item" onClick={() => { document.getElementById('cmd-backdrop').classList.remove('is-open'); document.getElementById('create-project-modal')?.showModal(); }}>
+          <div className="cmd-item-icon">➕</div>
+          <div className="cmd-item-text"><div className="cmd-item-name">Create new workspace</div></div>
+        </div>
+      </div>
+      <div className="cmd-footer">
+        <span className="cmd-shortcut"><kbd className="cmd-key">↑</kbd> <kbd className="cmd-key">↓</kbd> to navigate</span>
+        <span className="cmd-shortcut"><kbd className="cmd-key">Enter</kbd> to select</span>
+        <span className="cmd-shortcut"><kbd className="cmd-key">Esc</kbd> to close</span>
+      </div>
+    </div>
+  </div>
+
+  <script dangerouslySetInnerHTML={{__html: `
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const backdrop = document.getElementById('cmd-backdrop');
+        if (backdrop) {
+          backdrop.classList.toggle('is-open');
+          if (backdrop.classList.contains('is-open')) {
+            setTimeout(() => document.getElementById('cmd-input')?.focus(), 50);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        document.getElementById('cmd-backdrop')?.classList.remove('is-open');
+      }
+    });
+  `}} />
 
   </div>
     </>
