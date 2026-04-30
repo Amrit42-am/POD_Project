@@ -398,6 +398,13 @@ function renderWorkspaceOverview() {
     }
   });
 
+  // Update focus strip chips
+  const focusTasks = document.getElementById('focus-tasks-due');
+  const focusTeam = document.getElementById('focus-team-online');
+  if (focusTasks) focusTasks.textContent = `${inProgressTasks} task${inProgressTasks !== 1 ? 's' : ''} in progress`;
+  if (focusTeam) focusTeam.textContent = `${memberCount} team member${memberCount !== 1 ? 's' : ''}`;
+
+
   const overviewTitle = document.getElementById("workspace-overview-title");
   if (overviewTitle) {
     overviewTitle.textContent = `${workspaceName} is live`;
@@ -734,7 +741,14 @@ async function loadTeam() {
     
     if(!teamData || !teamData.members || teamData.members.length === 0) {
       teamList.innerHTML = `
-        <div class="team-empty">You aren't in a workspace yet.</div>
+        <div class="team-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;margin-bottom:0.75rem">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <strong style="display:block;font-size:0.95rem;font-weight:700;margin-bottom:0.35rem">No workspace yet</strong>
+          <span style="font-size:0.82rem;opacity:0.65">Create one to start collaborating with your team.</span>
+        </div>
         <button class="btn btn-secondary wide-button" onclick="document.getElementById('create-team-modal').showModal()">Create Workspace</button>
       `;
       const invitePanel = document.getElementById("invite-panel");
@@ -839,9 +853,11 @@ function renderTasks() {
   if(activeTasks.length === 0) {
     cols["To Do"].innerHTML = `
       <div class="task-empty task-empty-state">
-        <div class="task-empty-icon" aria-hidden="true"></div>
-        <strong class="task-empty-title">No tasks yet</strong>
-        <p class="task-empty-copy">Add the first task to turn this board into motion.</p>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;margin-bottom:0.75rem">
+          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        <strong class="task-empty-title">Board is clear</strong>
+        <p class="task-empty-copy">Your team has no active tasks. Ready to start? Add the first one.</p>
       </div>
     `;
     return;
@@ -936,9 +952,11 @@ function renderArchivedTasks() {
   if (safeArchivedTasks.length === 0) {
     archiveList.innerHTML = `
       <div class="archive-empty">
-        <div class="task-empty-icon archive-empty-icon" aria-hidden="true"></div>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;margin-bottom:0.75rem">
+          <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+        </svg>
         <strong class="task-empty-title">Archive is empty</strong>
-        <p class="task-empty-copy">Completed work will appear here 24 hours after it lands in Done.</p>
+        <p class="task-empty-copy">Completed tasks appear here automatically 24 hours after reaching Done.</p>
       </div>
     `;
     return;
@@ -1464,8 +1482,20 @@ bootstrap();
       
       <section id="view-board" className="view-section active">
         <div className="app-main-header">
-          <h1 className="app-main-title">Team Dashboard</h1>
-          <p className="app-main-subtitle" id="board-subtitle">Project Overview</p>
+          <div>
+            <h1 className="app-main-title">Team Dashboard</h1>
+            <p className="app-main-subtitle" id="board-subtitle">Project Overview</p>
+          </div>
+          <div className="dashboard-focus-strip">
+            <span className="focus-strip-label">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',marginRight:'5px',verticalAlign:'middle'}}>
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Today's Focus
+            </span>
+            <span id="focus-tasks-due" className="focus-strip-chip">— tasks in progress</span>
+            <span id="focus-team-online" className="focus-strip-chip">— team members</span>
+          </div>
         </div>
 
         <div className="dashboard-command-grid">
