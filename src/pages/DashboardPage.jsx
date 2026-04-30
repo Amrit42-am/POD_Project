@@ -915,7 +915,21 @@ function renderTasks() {
     const div = document.createElement("div");
     div.className = `task-card ${isDoneTask ? "task-card-completed-window" : ""}`;
     div.draggable = canMove;
-    
+
+    // Due date badge logic
+    let deadlineBadge = "";
+    if (task.deadline) {
+      const now = new Date();
+      const due = new Date(task.deadline);
+      const diffHours = (due - now) / (1000 * 60 * 60);
+      const label = due.toLocaleDateString([], { month: "short", day: "numeric" });
+      let cls = "deadline-ok";
+      let icon = "📅";
+      if (diffHours < 0) { cls = "deadline-overdue"; icon = "⚠️"; }
+      else if (diffHours < 24) { cls = "deadline-soon"; icon = "⏰"; }
+      deadlineBadge = `<div class="task-deadline ${cls}">${icon} Due ${label}</div>`;
+    }
+
     div.innerHTML = `
       <div class="task-state-row">
         <span class="task-state-pill ${targetStatus === "Done" ? "is-completed" : "is-active"}">${targetStatus === "Done" ? "Completed" : "Active"}</span>
@@ -923,6 +937,7 @@ function renderTasks() {
       </div>
       <div class="task-title">${escapeHtml(task.title)}</div>
       <div class="task-desc">${escapeHtml(task.description || "No description provided.")}</div>
+      ${deadlineBadge}
       <div class="task-meta">
         <strong class="task-assignee" title="${formatTaskAssignees(task)}">${formatTaskAssignees(task)}</strong>
         <span class="task-urgency">${escapeHtml(task.priority || "Normal")}</span>
@@ -930,6 +945,7 @@ function renderTasks() {
       ${actionMarkup}
     `;
     col.appendChild(div);
+
   });
 }
 
@@ -1248,7 +1264,7 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
 
     if(taskSubmitBtn) {
       taskSubmitBtn.disabled = true;
-      taskSubmitBtn.textContent = isEditMode ? "Saving..." : "Creating...";
+      taskSubmitBtn.classList.add('is-loading');
     }
 
     try {
@@ -1289,7 +1305,7 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
     } finally {
       if(taskSubmitBtn) {
         taskSubmitBtn.disabled = false;
-        taskSubmitBtn.textContent = taskModalMode === "edit" ? "Save Changes" : "Create Task";
+        taskSubmitBtn.classList.remove('is-loading');
       }
     }
   });
@@ -1331,7 +1347,14 @@ function renderMessages() {
   if(!container) return;
   
   if(messagesData.length === 0) {
-    container.innerHTML = `<div class="chat-empty">It's quiet here.</div>`;
+    container.innerHTML = `
+      <div class="chat-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;margin-bottom:0.6rem">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <strong style="display:block;font-size:0.9rem;font-weight:700;margin-bottom:0.25rem">No messages yet</strong>
+        <span style="font-size:0.8rem;opacity:0.6">Be the first to say something!</span>
+      </div>`;
     renderWorkspaceOverview();
     return;
   }
@@ -1440,6 +1463,38 @@ bootstrap();
 
   <div className="app-layout">
     
+    {/* Mobile hamburger button */}
+    <button
+      className="sidebar-hamburger"
+      id="sidebar-hamburger"
+      aria-label="Toggle menu"
+      onClick={() => {
+        const sidebar = document.querySelector('.app-sidebar');
+        const hamburger = document.getElementById('sidebar-hamburger');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar?.classList.toggle('is-open');
+        hamburger?.classList.toggle('is-open');
+        overlay?.classList.toggle('is-visible');
+      }}
+    >
+      <span className="hamburger-line" />
+      <span className="hamburger-line" />
+      <span className="hamburger-line" />
+    </button>
+
+    {/* Overlay backdrop */}
+    <div
+      id="sidebar-overlay"
+      className="sidebar-overlay"
+      onClick={() => {
+        const sidebar = document.querySelector('.app-sidebar');
+        const hamburger = document.getElementById('sidebar-hamburger');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar?.classList.remove('is-open');
+        hamburger?.classList.remove('is-open');
+        overlay?.classList.remove('is-visible');
+      }}
+    />
     
     <aside className="app-sidebar">
       <div className="sidebar-header">

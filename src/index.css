@@ -6373,4 +6373,197 @@ html[data-theme="dark"] {
   color: var(--text-secondary);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   FIX 1: DUE DATE BADGES on Kanban task cards
+   ══════════════════════════════════════════════════════════════ */
 
+.task-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--r-xl);
+  margin-top: 0.4rem;
+  width: fit-content;
+  border: 1px solid transparent;
+}
+
+.task-deadline.deadline-ok {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.task-deadline.deadline-soon {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.task-deadline.deadline-overdue {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.25);
+  animation: pulse-overdue 2s ease-in-out infinite;
+}
+
+@keyframes pulse-overdue {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 2: BUTTON LOADING STATES
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn.is-loading {
+  pointer-events: none;
+  opacity: 0.75;
+  position: relative;
+  color: transparent !important;
+}
+
+.btn.is-loading::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: btn-spin 0.65s linear infinite;
+}
+
+.btn-secondary.is-loading::after,
+.btn-ghost.is-loading::after {
+  border-color: rgba(99, 102, 241, 0.25);
+  border-top-color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 3: PAGE / VIEW TRANSITION ANIMATIONS
+   ══════════════════════════════════════════════════════════════ */
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-section {
+  animation: view-in 0.22s var(--ease-out) both;
+}
+
+/* Stagger child cards inside an entering view */
+.view-section .project-card,
+.view-section .task-card,
+.view-section .archive-card,
+.view-section .dashboard-command-card {
+  animation: view-in 0.3s var(--ease-out) both;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 4: MOBILE SIDEBAR — Hamburger menu
+   ══════════════════════════════════════════════════════════════ */
+
+.sidebar-hamburger {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1000;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: var(--shadow-md);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all var(--speed) var(--ease-spring);
+}
+
+.sidebar-hamburger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.05);
+}
+
+.hamburger-line {
+  width: 18px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 2px;
+  transition: all var(--speed) var(--ease-spring);
+}
+
+/* X state when sidebar is open */
+.sidebar-hamburger.is-open .hamburger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.sidebar-hamburger.is-open .hamburger-line:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.sidebar-hamburger.is-open .hamburger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Sidebar overlay backdrop on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 99;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: view-in 0.2s ease both;
+}
+
+@media (max-width: 900px) {
+  .sidebar-hamburger { display: flex; }
+
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform var(--speed-slow) var(--ease-spring);
+    width: 240px !important;
+  }
+
+  .app-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .sidebar-overlay.is-visible { display: block; }
+
+  .app-main {
+    padding-top: 4rem !important;
+  }
+}
+
+[data-theme="light"] .sidebar-hamburger {
+  background: #fff;
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="light"] .hamburger-line {
+  background: var(--text-secondary);
+}
