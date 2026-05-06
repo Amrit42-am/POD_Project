@@ -81,15 +81,43 @@ const CLUSTER_CENTERS = [
 
 /* ── Sparkle particles ───────────────────────────────────── */
 
-const SPARKLE_COUNT = 40;
+const SPARKLE_COUNT = 24;
 
-const CONNECT_DIST = 200;
+const CONNECT_DIST = 150;
 const CURSOR_RADIUS = 160;
+const TARGET_FPS = 45;
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
 function rand(a, b) { return a + Math.random() * (b - a); }
 function rgba(c, a) { return `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`; }
+
+function getPerformanceProfile() {
+  const nav = window.navigator;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersDataSaver = Boolean(nav?.connection?.saveData);
+  const lowCpuDevice = (nav?.hardwareConcurrency ?? 8) <= 4;
+  const lowMemoryDevice = (nav?.deviceMemory ?? 8) <= 4;
+  const lowPerformance = prefersReducedMotion || prefersDataSaver || lowCpuDevice || lowMemoryDevice;
+
+  if (lowPerformance) {
+    return {
+      sparkleCount: 10,
+      connectDist: 110,
+      targetFps: 28,
+      disablePointerEffects: true,
+      maxNodes: 70,
+    };
+  }
+
+  return {
+    sparkleCount: SPARKLE_COUNT,
+    connectDist: CONNECT_DIST,
+    targetFps: TARGET_FPS,
+    disablePointerEffects: false,
+    maxNodes: Infinity,
+  };
+}
 
 function createClusteredNodes(w, h) {
   const nodes = [];
@@ -127,9 +155,9 @@ function createClusteredNodes(w, h) {
   return nodes;
 }
 
-function createSparkles(w, h) {
+function createSparkles(w, h, count) {
   const sparkles = [];
-  for (let i = 0; i < SPARKLE_COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     sparkles.push({
       x: rand(0, w),
       y: rand(0, h),
@@ -152,6 +180,9 @@ export default function CollabNodesBackground() {
   const ptrRef = useRef({ x: -9999, y: -9999, on: false });
   const frameRef = useRef(0);
   const dimRef = useRef({ w: 0, h: 0 });
+  const rectRef = useRef({ left: 0, top: 0 });
+  const lastFrameTimeRef = useRef(0);
+  const profileRef = useRef(null);
   const { theme } = useTheme();
   const themeRef = useRef(theme);
 
@@ -160,19 +191,25 @@ export default function CollabNodesBackground() {
   }, [theme]);
 
   const init = useCallback((w, h) => {
-    nodesRef.current = createClusteredNodes(w, h);
-    sparklesRef.current = createSparkles(w, h);
+    const profile = profileRef.current;
+    if (!profile) return;
+    const nextNodes = createClusteredNodes(w, h);
+    nodesRef.current = profile.maxNodes < nextNodes.length ? nextNodes.slice(0, profile.maxNodes) : nextNodes;
+    sparklesRef.current = createSparkles(w, h, profile.sparkleCount);
   }, []);
 
   useEffect(() => {
     const cvs = canvasRef.current;
     if (!cvs) return;
+    profileRef.current = getPerformanceProfile();
     const ctx = cvs.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     const resize = () => {
       const p = cvs.parentElement;
       if (!p) return;
+      const rect = cvs.getBoundingClientRect();
+      rectRef.current = { left: rect.left, top: rect.top };
       const w = p.clientWidth;
       const h = p.clientHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -197,9 +234,9 @@ export default function CollabNodesBackground() {
     resize();
 
     const onMove = (e) => {
-      const rect = cvs.getBoundingClientRect();
-      ptrRef.current.x = e.clientX - rect.left;
-      ptrRef.current.y = e.clientY - rect.top;
+      if (profileRef.current?.disablePointerEffects) return;
+      ptrRef.current.x = e.clientX - rectRef.current.left;
+      ptrRef.current.y = e.clientY - rectRef.current.top;
       ptrRef.current.on = true;
     };
     const onLeave = () => { ptrRef.current.on = false; };
@@ -208,6 +245,17 @@ export default function CollabNodesBackground() {
 
     /* ---- render ---- */
     const render = (ts) => {
+      const profile = profileRef.current;
+      if (!profile) {
+        frameRef.current = requestAnimationFrame(render);
+        return;
+      }
+      const frameInterval = 1000 / profile.targetFps;
+      if (ts - lastFrameTimeRef.current < frameInterval) {
+        frameRef.current = requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTimeRef.current = ts;
       const t = ts * 0.001;
       const { w, h } = dimRef.current;
       if (w === 0) { frameRef.current = requestAnimationFrame(render); return; }
@@ -260,7 +308,7 @@ export default function CollabNodesBackground() {
         n.y = n.hy + Math.sin(a * 0.7 + n.phase) * n.driftR * 0.6;
         n._pulse = 1 + Math.sin(t * n.pulseS + n.pulseP) * 0.12;
 
-        if (ptr.on) {
+        if (ptr.on && !profile.disablePointerEffects) {
           const dx = n.x - ptr.x, dy = n.y - ptr.y;
           const d = Math.sqrt(dx * dx + dy * dy);
           if (d < CURSOR_RADIUS && d > 0.5) {
@@ -279,7 +327,7 @@ export default function CollabNodesBackground() {
 
       /* ═══ 4. Connection lines — spatial-grid optimised ═══ */
       // Build grid: cell size = CONNECT_DIST so only 9 cells need checking per node
-      const cellSize = CONNECT_DIST;
+      const cellSize = profile.connectDist;
       const cols = Math.ceil(w / cellSize) + 1;
       const rows = Math.ceil(h / cellSize) + 1;
       const grid = new Array(cols * rows);
@@ -313,8 +361,8 @@ export default function CollabNodesBackground() {
               const b = nodes[j];
               const ddx = a.x - b.x, ddy = a.y - b.y;
               const d = Math.sqrt(ddx * ddx + ddy * ddy);
-              if (d < CONNECT_DIST) {
-                const strength = 1 - d / CONNECT_DIST;
+              if (d < profile.connectDist) {
+                const strength = 1 - d / profile.connectDist;
                 const lineA = strength * 0.25;
 
                 // glow pass (thick, faint)
@@ -414,7 +462,7 @@ export default function CollabNodesBackground() {
       }
 
       /* ═══ 7. Cursor glow ═══ */
-      if (ptr.on) {
+      if (ptr.on && !profile.disablePointerEffects) {
         const cg = ctx.createRadialGradient(ptr.x, ptr.y, 0, ptr.x, ptr.y, 100);
         cg.addColorStop(0, 'rgba(147,51,234,0.08)');
         cg.addColorStop(0.4, 'rgba(139,92,246,0.04)');
