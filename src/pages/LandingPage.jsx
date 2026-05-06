@@ -12,6 +12,14 @@ export default function LandingPage() {
   useEffect(() => {
     document.body.classList.add("landing-body");
     const landingRoot = document.querySelector(".landing-page");
+    const nav = window.navigator;
+    const prefersDataSaver = Boolean(nav?.connection?.saveData);
+    const lowCpuDevice = (nav?.hardwareConcurrency ?? 8) <= 4;
+    const lowMemoryDevice = (nav?.deviceMemory ?? 8) <= 4;
+    const isLowPerformanceDevice = prefersDataSaver || lowCpuDevice || lowMemoryDevice;
+    if (isLowPerformanceDevice) {
+      document.body.classList.add("landing-performance-guard");
+    }
     let motionContext = null;
     let disposeLandingScene = null;
     let sectionObserver = null;
@@ -22,6 +30,8 @@ export default function LandingPage() {
     let cursorTargets = [];
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const pointerState = { x: 0.5, y: 0.34, active: false };
+    let rootBounds = null;
+    let pointerMoveRaf = 0;
 
     if (landingRoot && !prefersReducedMotion) {
       motionContext = gsap.context(() => {
@@ -59,6 +69,7 @@ export default function LandingPage() {
     if (
       landingRoot &&
       !prefersReducedMotion &&
+      !isLowPerformanceDevice &&
       window.matchMedia("(pointer: fine)").matches &&
       window.matchMedia("(hover: hover)").matches
     ) {
@@ -68,24 +79,31 @@ export default function LandingPage() {
       if (cursor || atmosphere) {
         document.body.classList.add("has-custom-cursor");
 
-        const moveCursorX = cursor ? gsap.quickTo(cursor, "x", { duration: 0.2, ease: "power3.out" }) : null;
-        const moveCursorY = cursor ? gsap.quickTo(cursor, "y", { duration: 0.2, ease: "power3.out" }) : null;
+        const setCursorX = cursor ? gsap.quickSetter(cursor, "x", "px") : null;
+        const setCursorY = cursor ? gsap.quickSetter(cursor, "y", "px") : null;
+        const updateBounds = () => {
+          rootBounds = landingRoot.getBoundingClientRect();
+        };
+        updateBounds();
+        window.addEventListener("resize", updateBounds);
+        window.addEventListener("scroll", updateBounds, { passive: true });
 
         handlePointerMove = (event) => {
           document.body.classList.add("cursor-active");
-          moveCursorX?.(event.clientX);
-          moveCursorY?.(event.clientY);
+          setCursorX?.(event.clientX);
+          setCursorY?.(event.clientY);
 
-          if (atmosphere) {
-            const bounds = landingRoot.getBoundingClientRect();
-            const relativeX = (event.clientX - bounds.left) / bounds.width;
-            const relativeY = (event.clientY - bounds.top) / bounds.height;
+          if (atmosphere && rootBounds) {
+            const relativeX = (event.clientX - rootBounds.left) / rootBounds.width;
+            const relativeY = (event.clientY - rootBounds.top) / rootBounds.height;
             pointerState.x = Math.min(1, Math.max(0, relativeX));
             pointerState.y = Math.min(1, Math.max(0, relativeY));
             pointerState.active = true;
-
-            atmosphere.style.setProperty("--pointer-x", `${(relativeX * 100).toFixed(2)}%`);
-            atmosphere.style.setProperty("--pointer-y", `${(relativeY * 100).toFixed(2)}%`);
+            if (pointerMoveRaf) cancelAnimationFrame(pointerMoveRaf);
+            pointerMoveRaf = requestAnimationFrame(() => {
+              atmosphere.style.setProperty("--pointer-x", `${(relativeX * 100).toFixed(2)}%`);
+              atmosphere.style.setProperty("--pointer-y", `${(relativeY * 100).toFixed(2)}%`);
+            });
           }
         };
 
@@ -109,12 +127,17 @@ export default function LandingPage() {
           )
         );
 
-        landingRoot.addEventListener("pointermove", handlePointerMove);
-        landingRoot.addEventListener("pointerleave", handlePointerLeave);
+        window.addEventListener("pointermove", handlePointerMove, { passive: true });
+        window.addEventListener("pointerleave", handlePointerLeave);
         cursorTargets.forEach((target) => {
           target.addEventListener("pointerenter", handleHoverEnter);
           target.addEventListener("pointerleave", handleHoverLeave);
         });
+        disposeLandingScene = () => {
+          window.removeEventListener("resize", updateBounds);
+          window.removeEventListener("scroll", updateBounds);
+          if (pointerMoveRaf) cancelAnimationFrame(pointerMoveRaf);
+        };
       }
     }
 
@@ -249,6 +272,7 @@ export default function LandingPage() {
       if (authDialog && !authDialog.open) {
         authDialog.showModal();
       }
+      document.body.classList.add("auth-dialog-open");
     }
 
     function initialsFor(name) {
@@ -370,7 +394,10 @@ export default function LandingPage() {
       const target = event.target;
       if (box && target && !box.contains(target)) authDialog.close();
     };
-    const handleDialogClose = () => setFeedback("");
+    const handleDialogClose = () => {
+      setFeedback("");
+      document.body.classList.remove("auth-dialog-open");
+    };
     if (authDialog) authDialog.addEventListener("click", handleBackdropClick);
     if (authDialog) authDialog.addEventListener("close", handleDialogClose);
 
@@ -399,13 +426,20 @@ export default function LandingPage() {
       disposeLandingScene?.();
       sectionObserver?.disconnect();
       landingRoot?.classList.remove("landing-motion-ready");
-      if (landingRoot && handlePointerMove) landingRoot.removeEventListener("pointermove", handlePointerMove);
-      if (landingRoot && handlePointerLeave) landingRoot.removeEventListener("pointerleave", handlePointerLeave);
+      if (handlePointerMove) window.removeEventListener("pointermove", handlePointerMove);
+      if (handlePointerLeave) window.removeEventListener("pointerleave", handlePointerLeave);
       cursorTargets.forEach((target) => {
         if (handleHoverEnter) target.removeEventListener("pointerenter", handleHoverEnter);
         if (handleHoverLeave) target.removeEventListener("pointerleave", handleHoverLeave);
       });
-      document.body.classList.remove("landing-body", "has-custom-cursor", "cursor-active", "cursor-hover");
+      document.body.classList.remove(
+        "landing-body",
+        "has-custom-cursor",
+        "cursor-active",
+        "cursor-hover",
+        "landing-performance-guard",
+        "auth-dialog-open"
+      );
       for (const trigger of authTriggers) trigger.removeEventListener("click", handleAuthTriggerClick);
       for (const tab of authTabs) tab.removeEventListener("click", handleTabClick);
       if (registerForm) { registerForm.removeEventListener("submit", handleRegisterSubmit); registerForm.removeEventListener("input", handleInput); }
