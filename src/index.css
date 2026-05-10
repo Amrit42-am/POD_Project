@@ -3736,6 +3736,245 @@ ul { list-style: none; padding: 0; margin: 0; }
   background: linear-gradient(90deg, rgba(249, 115, 22, 0.9), rgba(245, 158, 11, 0.84));
 }
 
+.dashboard-body .deadline-panel,
+.dashboard-body .contribution-panel {
+  overflow: hidden;
+}
+
+.dashboard-body .deadline-panel-head,
+.dashboard-body .contribution-panel-head-split {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-body .deadline-stat-grid,
+.dashboard-body .peer-rating-summary-grid,
+.dashboard-body .weekly-report-summary-grid,
+.dashboard-body .weekly-report-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9rem;
+}
+
+.dashboard-body .deadline-stat-card,
+.dashboard-body .peer-rating-stat,
+.dashboard-body .weekly-report-summary-card,
+.dashboard-body .weekly-report-metric-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.dashboard-body .deadline-stat-card.is-overdue {
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.dashboard-body .deadline-stat-card.is-urgent {
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.dashboard-body .deadline-reminder-list,
+.dashboard-body .peer-rating-list,
+.dashboard-body .weekly-report-highlight-list,
+.dashboard-body .weekly-report-list,
+.dashboard-body .peer-rating-form-list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.dashboard-body .deadline-reminder-card,
+.dashboard-body .peer-rating-row,
+.dashboard-body .weekly-report-highlight-card,
+.dashboard-body .weekly-report-list-card,
+.dashboard-body .weekly-report-member-card,
+.dashboard-body .peer-rating-form-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.dashboard-body .deadline-reminder-card.is-overdue {
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.dashboard-body .deadline-reminder-card.is-urgent {
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.dashboard-body .deadline-reminder-copy,
+.dashboard-body .peer-rating-row-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.dashboard-body .deadline-reminder-head,
+.dashboard-body .peer-rating-form-head,
+.dashboard-body .weekly-report-member-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dashboard-body .deadline-reminder-head strong,
+.dashboard-body .peer-rating-row-copy strong,
+.dashboard-body .weekly-report-highlight-card strong,
+.dashboard-body .weekly-report-list-card strong,
+.dashboard-body .weekly-report-member-head strong,
+.dashboard-body .peer-rating-form-head strong,
+.dashboard-body .weekly-report-hero strong {
+  color: #111b2d;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-body .deadline-reminder-meta,
+.dashboard-body .peer-rating-row-copy span,
+.dashboard-body .peer-rating-note,
+.dashboard-body .weekly-report-highlight-card span,
+.dashboard-body .weekly-report-list-card span,
+.dashboard-body .weekly-report-member-head span,
+.dashboard-body .weekly-report-member-stats span {
+  color: #62738b;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.dashboard-body .deadline-reminder-badge {
+  flex-shrink: 0;
+  align-self: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(248, 250, 252, 0.95);
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dashboard-body .deadline-reminder-badge.is-overdue {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.95);
+  border-color: rgba(248, 113, 113, 0.22);
+}
+
+.dashboard-body .deadline-reminder-badge.is-urgent {
+  color: #b45309;
+  background: rgba(255, 247, 237, 0.95);
+  border-color: rgba(251, 191, 36, 0.24);
+}
+
+.dashboard-body .deadline-reminder-empty,
+.dashboard-body .peer-rating-hero,
+.dashboard-body .weekly-report-loading {
+  margin-top: 1rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: 1.2rem;
+  border: 1px dashed rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-body .deadline-reminder-modal-grid,
+.dashboard-body .weekly-report-member-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.dashboard-body .contribution-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.dashboard-body .feature-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.dashboard-body .peer-rating-row {
+  align-items: center;
+}
+
+.dashboard-body .peer-rating-row-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-body .peer-rating-score {
+  color: #0f172a;
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.dashboard-body .peer-rating-form-card,
+.dashboard-body .weekly-report-member-card {
+  flex-direction: column;
+}
+
+.dashboard-body .weekly-report-hero {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+}
+
+.dashboard-body .weekly-report-section + .weekly-report-section {
+  margin-top: 1.3rem;
+}
+
+.dashboard-body .weekly-report-summary-grid,
+.dashboard-body .weekly-report-member-stats {
+  margin-top: 1rem;
+}
+
+.dashboard-body .weekly-report-member-stats {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.dashboard-body .task-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.feature-modal-shell {
+  max-width: min(760px, calc(100vw - 2rem));
+}
+
+.report-modal-shell {
+  max-width: min(920px, calc(100vw - 2rem));
+}
+
 .dashboard-body .contribution-layout {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(320px, 1fr);
@@ -4256,10 +4495,17 @@ ul { list-style: none; padding: 0; margin: 0; }
     grid-template-columns: 1fr;
   }
 
+  .dashboard-body .contribution-secondary-grid,
+  .dashboard-body .task-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-body .contribution-chart-shell {
     min-height: 280px;
   }
 
+  .dashboard-body .deadline-panel-head,
+  .dashboard-body .contribution-panel-head-split,
   .dashboard-body .contribution-member-card-head,
   .dashboard-body .contribution-member-stats {
     align-items: flex-start;
@@ -4268,6 +4514,12 @@ ul { list-style: none; padding: 0; margin: 0; }
 
   .dashboard-body .contribution-member-share {
     font-size: 1.25rem;
+  }
+
+  .dashboard-body .deadline-reminder-card,
+  .dashboard-body .peer-rating-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -5153,6 +5405,64 @@ ul { list-style: none; padding: 0; margin: 0; }
   grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-stat-card,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-stat,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-summary-card,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-metric-card,
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-card,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-row,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-highlight-card,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-list-card,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-member-card,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-form-card,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-hero,
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-empty,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-hero,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-loading {
+  border-color: rgba(173, 194, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 28px rgba(0, 0, 0, 0.18);
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-head strong,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-row-copy strong,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-highlight-card strong,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-list-card strong,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-member-head strong,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-form-head strong,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-hero strong,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-score {
+  color: #f7fbff;
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-meta,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-row-copy span,
+:is(.app-shell-theme, .dashboard-body) .peer-rating-note,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-highlight-card span,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-list-card span,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-member-head span,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-member-stats span {
+  color: #8ea1c7;
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge {
+  border-color: rgba(173, 194, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d7e4ff;
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge.is-overdue {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.36);
+}
+
+:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge.is-urgent {
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.36);
 }
 
 :is(.app-shell-theme, .dashboard-body) .dashboard-command-feature {

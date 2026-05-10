@@ -1,6 +1,8 @@
+import "dotenv/config";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import test from "node:test";
+import { MongoClient } from "mongodb";
 
 const HOST = "127.0.0.1";
 const PORT = 3101;
@@ -84,11 +86,13 @@ async function waitForServer() {
 }
 
 test("leader/member flow preserves permissions and current membership identity", async (t) => {
+  const testDbName = `collabspace_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const server = spawn("node", ["server.js"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       HOST,
+      MONGODB_DB_NAME: testDbName,
       PORT: String(PORT)
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -105,6 +109,15 @@ test("leader/member flow preserves permissions and current membership identity",
   t.after(async () => {
     server.kill("SIGTERM");
     await new Promise((resolve) => server.once("exit", resolve));
+
+    if (!process.env.MONGODB_URI) {
+      return;
+    }
+
+    const client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    await client.db(testDbName).dropDatabase();
+    await client.close();
   });
 
   await waitForServer();
@@ -202,6 +215,7 @@ test("leader/member flow preserves permissions and current membership identity",
     body: JSON.stringify({
       title: "Member-only task",
       description: "Only the member should own this task.",
+      deadline: "2099-12-31",
       priority: "high",
       assignees: [{ id: memberId, name: "Member Example" }]
     }),
@@ -215,6 +229,7 @@ test("leader/member flow preserves permissions and current membership identity",
     body: JSON.stringify({
       title: "Shared task",
       description: "Leader and member share this task.",
+      deadline: "2099-12-30",
       priority: "medium",
       assignees: [
         { id: leaderId, name: "Leader Example" },
@@ -247,6 +262,16 @@ test("leader/member flow preserves permissions and current membership identity",
   assert.equal(sharedTaskMove.response.status, 200, JSON.stringify(sharedTaskMove.payload));
   assert.equal(sharedTaskMove.payload.task.status, "In Progress");
 
+  const memberTaskDone = await member.request(
+    `/api/tasks/${memberTaskCreate.payload.task.id}?teamId=${encodeURIComponent(team.id)}`,
+    {
+      body: JSON.stringify({ status: "Done", teamId: team.id }),
+      method: "PUT"
+    }
+  );
+  assert.equal(memberTaskDone.response.status, 200, JSON.stringify(memberTaskDone.payload));
+  assert.equal(memberTaskDone.payload.task.status, "Done");
+
   const memberInviteAttempt = await member.request(`/api/team/members?teamId=${encodeURIComponent(team.id)}`, {
     body: JSON.stringify({ email: uniqueEmail("forbidden"), teamId: team.id }),
     method: "POST"
@@ -278,4 +303,60 @@ test("leader/member flow preserves permissions and current membership identity",
   });
   assert.equal(profileEscalationAttempt.response.status, 200, JSON.stringify(profileEscalationAttempt.payload));
   assert.notEqual(profileEscalationAttempt.payload.user.role, "Leader");
+
+  const leaderRatingsSave = await leader.request(`/api/peer-ratings?teamId=${encodeURIComponent(team.id)}`, {
+    body: JSON.stringify({
+      ratings: [
+        {
+          ratedUserId: memberId,
+          score: 5,
+          feedback: "Consistent delivery and clean handoffs."
+        }
+      ],
+      teamId: team.id
+    }),
+    method: "PUT"
+  });
+  assert.equal(leaderRatingsSave.response.status, 200, JSON.stringify(leaderRatingsSave.payload));
+
+  const memberRatingsSave = await member.request(`/api/peer-ratings?teamId=${encodeURIComponent(team.id)}`, {
+    body: JSON.stringify({
+      ratings: [
+        {
+          ratedUserId: leaderId,
+          score: 4,
+          feedback: "Clear planning and quick unblock support."
+        }
+      ],
+      teamId: team.id
+    }),
+    method: "PUT"
+  });
+  assert.equal(memberRatingsSave.response.status, 200, JSON.stringify(memberRatingsSave.payload));
+
+  const selfRatingAttempt = await member.request(`/api/peer-ratings?teamId=${encodeURIComponent(team.id)}`, {
+    body: JSON.stringify({
+      ratings: [{ ratedUserId: memberId, score: 5 }],
+      teamId: team.id
+    }),
+    method: "PUT"
+  });
+  assert.equal(selfRatingAttempt.response.status, 400, JSON.stringify(selfRatingAttempt.payload));
+
+  const peerRatingsSnapshot = await leader.request(`/api/peer-ratings?teamId=${encodeURIComponent(team.id)}`);
+  assert.equal(peerRatingsSnapshot.response.status, 200, JSON.stringify(peerRatingsSnapshot.payload));
+  assert.equal(peerRatingsSnapshot.payload.peerRatings.summary.totalRatings, 2);
+  assert.equal(peerRatingsSnapshot.payload.peerRatings.summary.participationCount, 2);
+  assert.equal(peerRatingsSnapshot.payload.peerRatings.summary.teamAverageScore, 4.5);
+  assert.equal(
+    peerRatingsSnapshot.payload.peerRatings.currentUserRatings[memberId].score,
+    5
+  );
+
+  const weeklyReport = await leader.request(`/api/weekly-report?teamId=${encodeURIComponent(team.id)}`);
+  assert.equal(weeklyReport.response.status, 200, JSON.stringify(weeklyReport.payload));
+  assert.equal(weeklyReport.payload.report.summary.createdThisWeek, 2);
+  assert.equal(weeklyReport.payload.report.summary.completedThisWeek, 1);
+  assert.equal(weeklyReport.payload.report.summary.peerRatingAverage, 4.5);
+  assert.match(weeklyReport.payload.report.plainText, /Weekly Progress Report:/);
 });

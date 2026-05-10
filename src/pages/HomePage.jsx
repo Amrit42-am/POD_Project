@@ -601,7 +601,7 @@ async function bootstrap() {
     await checkInvitations();
   } catch (err) {
     console.error(err);
-    navigate("/index.html");
+    navigate("/");
   }
 }
 
@@ -723,7 +723,7 @@ async function logout() {
   } catch (error) {
     console.error("Logout failed", error);
   }
-  navigate("/index.html");
+  navigate("/");
 }
 
   const form = document.getElementById("create-project-form");

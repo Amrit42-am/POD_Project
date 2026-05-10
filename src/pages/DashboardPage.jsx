@@ -14,17 +14,22 @@ export default function DashboardPage() {
     let currentUser = authCurrentUser;
     const toastContainer = document.getElementById("toast-container");
 
-    // Use a custom mechanism for URL parameters inside the JS
-    const originalURLSearchParams = URLSearchParams;
-    window.URLSearchParams = function(query) {
-      return new originalURLSearchParams(location.search);
-    };
-
     // We'll wrap all the logic from dashboard.js here
 let teamData = null;
 let tasksData = [];
 let archivedTasksData = [];
 let messagesData = [];
+let peerRatingsData = {
+  currentUserRatings: {},
+  members: [],
+  summary: {
+    eligibleRaters: 0,
+    participationCount: 0,
+    teamAverageScore: 0,
+    totalRatings: 0
+  }
+};
+let weeklyReportData = null;
 const TASK_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
 const MOVE_PERMISSION_MESSAGE = "You can only move tasks assigned to you";
 const EDIT_PERMISSION_MESSAGE = "Only the project leader can edit task details";
@@ -352,6 +357,266 @@ function formatTaskAssignees(task) {
     return task.assignees.map(a => escapeHtml(String(a.name || "").trim())).filter(Boolean).join(", ");
   }
   return escapeHtml(String(task?.assignee || "Unassigned").trim() || "Unassigned");
+}
+
+function getTaskAssigneeNames(task) {
+  if (Array.isArray(task?.assignees) && task.assignees.length > 0) {
+    const names = task.assignees
+      .map((assignee) => String(assignee?.name || "").trim())
+      .filter(Boolean);
+    if (names.length > 0) {
+      return names;
+    }
+  }
+
+  const assigneeName = String(task?.assignee || "").trim();
+  return assigneeName ? [assigneeName] : [];
+}
+
+function formatDeadlineInputValue(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    return text;
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDeadlineValue(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day), 23, 59, 59, 999);
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatReminderDistance(deadlineValue) {
+  const dueDate = parseDeadlineValue(deadlineValue);
+  if (!dueDate) {
+    return "No due date";
+  }
+
+  const diffMs = dueDate.getTime() - Date.now();
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMs < 0) {
+    if (Math.abs(diffHours) < 24) {
+      return `Overdue by ${Math.max(1, Math.abs(diffHours))}h`;
+    }
+    return `Overdue by ${Math.max(1, Math.abs(diffDays))}d`;
+  }
+
+  if (diffHours <= 24) {
+    return diffHours <= 1 ? "Due within 1h" : `Due in ${diffHours}h`;
+  }
+
+  if (diffDays <= 7) {
+    return `Due in ${diffDays}d`;
+  }
+
+  return `Due ${dueDate.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+}
+
+function buildDeadlineReminderModel() {
+  const reminders = [];
+  const safeTasks = Array.isArray(tasksData) ? tasksData : [];
+  const activeTasks = safeTasks.filter(
+    (task) => !isArchivedTask(task) && normalizeTaskStatus(task?.status) !== "Done"
+  );
+  const now = Date.now();
+  const nextWeekMs = 7 * 24 * 60 * 60 * 1000;
+  const nextDayMs = 24 * 60 * 60 * 1000;
+
+  activeTasks.forEach((task) => {
+    const dueDate = parseDeadlineValue(task?.deadline);
+    if (!dueDate) {
+      return;
+    }
+
+    const diffMs = dueDate.getTime() - now;
+    if (diffMs > nextWeekMs) {
+      return;
+    }
+
+    const isMine = isTaskAssignedToCurrentUser(task);
+    const severity = diffMs < 0 ? "overdue" : diffMs <= nextDayMs ? "urgent" : "upcoming";
+    const severityRank = diffMs < 0 ? 0 : diffMs <= nextDayMs ? 1 : 2;
+    reminders.push({
+      assignees: getTaskAssigneeNames(task),
+      dueLabel: formatReminderDistance(task.deadline),
+      dueTime: dueDate.getTime(),
+      id: `task-${task.id}`,
+      isMine,
+      severity,
+      severityRank,
+      subtitle: task.priority ? `${task.priority} priority` : "Open task",
+      title: String(task.title || "Untitled task").trim()
+    });
+  });
+
+  const projectDeadline = parseDeadlineValue(teamData?.deadline);
+  if (projectDeadline && projectDeadline.getTime() - now <= 14 * 24 * 60 * 60 * 1000) {
+    const diffMs = projectDeadline.getTime() - now;
+    reminders.push({
+      assignees: [],
+      dueLabel: formatReminderDistance(teamData.deadline),
+      dueTime: projectDeadline.getTime(),
+      id: "project-deadline",
+      isMine: true,
+      severity: diffMs < 0 ? "overdue" : diffMs <= nextWeekMs ? "urgent" : "upcoming",
+      severityRank: diffMs < 0 ? 0 : diffMs <= nextWeekMs ? 1 : 2,
+      subtitle: "Workspace milestone",
+      title: `${teamData?.projectTitle || teamData?.name || "Workspace"} deadline`
+    });
+  }
+
+  reminders.sort((left, right) => {
+    return (
+      left.severityRank - right.severityRank ||
+      Number(right.isMine) - Number(left.isMine) ||
+      left.dueTime - right.dueTime ||
+      left.title.localeCompare(right.title)
+    );
+  });
+
+  const overdueCount = reminders.filter((item) => item.severity === "overdue").length;
+  const urgentCount = reminders.filter((item) => item.severity === "urgent").length;
+  const upcomingCount = reminders.filter((item) => item.severity === "upcoming").length;
+
+  return {
+    items: reminders,
+    overdueCount,
+    upcomingCount,
+    urgentCount
+  };
+}
+
+function buildReminderItemMarkup(item) {
+  const assigneeLabel = item.assignees.length > 0 ? item.assignees.join(", ") : "Team-wide";
+  return `
+    <article class="deadline-reminder-card is-${item.severity}">
+      <div class="deadline-reminder-copy">
+        <div class="deadline-reminder-head">
+          <strong>${escapeHtml(item.title)}</strong>
+          ${item.isMine ? '<span class="task-state-pill is-editable">Mine</span>' : ""}
+        </div>
+        <p class="deadline-reminder-meta">${escapeHtml(item.subtitle)} · ${escapeHtml(assigneeLabel)}</p>
+      </div>
+      <span class="deadline-reminder-badge is-${item.severity}">${escapeHtml(item.dueLabel)}</span>
+    </article>
+  `;
+}
+
+function renderDeadlineReminderPanel() {
+  const stats = document.getElementById("deadline-reminder-stats");
+  const list = document.getElementById("deadline-reminder-list");
+  const subtitle = document.getElementById("deadline-reminder-subtitle");
+  const model = buildDeadlineReminderModel();
+
+  if (!stats || !list || !subtitle) {
+    return;
+  }
+
+  subtitle.textContent = teamData
+    ? "Live alerts for overdue work, near-term deadlines, and the project milestone."
+    : "Join a workspace to start tracking deadline reminders.";
+
+  if (!teamData) {
+    stats.innerHTML = `
+      <div class="deadline-stat-card">
+        <span class="dashboard-command-label">Reminders</span>
+        <strong class="dashboard-command-value">0</strong>
+        <span class="dashboard-command-note">No workspace connected</span>
+      </div>
+    `;
+    list.innerHTML = `
+      <div class="team-empty">
+        Connect to a workspace to see due dates and upcoming checkpoints here.
+      </div>
+    `;
+    return;
+  }
+
+  stats.innerHTML = `
+    <div class="deadline-stat-card is-overdue">
+      <span class="dashboard-command-label">Overdue</span>
+      <strong class="dashboard-command-value">${model.overdueCount}</strong>
+      <span class="dashboard-command-note">Items already past due</span>
+    </div>
+    <div class="deadline-stat-card is-urgent">
+      <span class="dashboard-command-label">Next 24h</span>
+      <strong class="dashboard-command-value">${model.urgentCount}</strong>
+      <span class="dashboard-command-note">Needs attention today</span>
+    </div>
+    <div class="deadline-stat-card">
+      <span class="dashboard-command-label">This Week</span>
+      <strong class="dashboard-command-value">${model.upcomingCount}</strong>
+      <span class="dashboard-command-note">Upcoming checkpoints</span>
+    </div>
+  `;
+
+  if (model.items.length === 0) {
+    list.innerHTML = `
+      <div class="deadline-reminder-empty">
+        <strong class="task-empty-title">No urgent deadlines right now</strong>
+        <p class="task-empty-copy">Add due dates while creating tasks and this reminder center will stay on watch for the team.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = model.items.slice(0, 4).map(buildReminderItemMarkup).join("");
+}
+
+function renderReminderCenter() {
+  const content = document.getElementById("deadline-modal-content");
+  if (!content) {
+    return;
+  }
+
+  const model = buildDeadlineReminderModel();
+  if (!teamData) {
+    content.innerHTML = `<div class="team-empty">No workspace selected yet.</div>`;
+    return;
+  }
+
+  if (model.items.length === 0) {
+    content.innerHTML = `
+      <div class="deadline-reminder-empty">
+        <strong class="task-empty-title">Everything looks calm</strong>
+        <p class="task-empty-copy">There are no overdue tasks or near-term deadlines in this workspace.</p>
+      </div>
+    `;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="deadline-reminder-modal-grid">
+      ${model.items.map(buildReminderItemMarkup).join("")}
+    </div>
+  `;
 }
 
 function getCompletionWindowLabel(task) {
@@ -701,11 +966,359 @@ function renderContributionTracker() {
 
 function loadAnalyticsV2() {
   renderContributionTracker();
+  renderPeerRatingPanel();
+  renderWeeklyReportPreview();
+  loadPeerRatings();
+  loadWeeklyReport();
+}
+
+function formatRatingValue(value) {
+  const rating = Number(value || 0);
+  return rating > 0 ? `${rating.toFixed(1)}/5` : "No ratings yet";
+}
+
+function renderPeerRatingPanel() {
+  const summary = document.getElementById("peer-rating-summary");
+  const list = document.getElementById("peer-rating-list");
+  const actionButton = document.getElementById("open-peer-rating-btn");
+
+  if (!summary || !list || !actionButton) {
+    return;
+  }
+
+  const members = Array.isArray(teamData?.members) ? teamData.members : [];
+
+  if (!teamData) {
+    actionButton.disabled = true;
+    summary.innerHTML = `<div class="team-empty">Join a workspace to unlock peer ratings.</div>`;
+    list.innerHTML = "";
+    return;
+  }
+
+  if (members.length <= 1) {
+    actionButton.disabled = true;
+    summary.innerHTML = `
+      <div class="peer-rating-hero">
+        <strong class="task-empty-title">Peer ratings start with a team</strong>
+        <p class="task-empty-copy">Invite at least one teammate to collect collaboration scores and balance feedback.</p>
+      </div>
+    `;
+    list.innerHTML = "";
+    return;
+  }
+
+  actionButton.disabled = false;
+
+  const safeSummary = peerRatingsData.summary || {
+    participationCount: 0,
+    teamAverageScore: 0,
+    totalRatings: 0
+  };
+  const safeMembers = Array.isArray(peerRatingsData.members) ? peerRatingsData.members : [];
+
+  summary.innerHTML = `
+    <div class="peer-rating-summary-grid">
+      <div class="peer-rating-stat">
+        <span class="dashboard-command-label">Team Average</span>
+        <strong class="dashboard-command-value">${escapeHtml(formatRatingValue(safeSummary.teamAverageScore))}</strong>
+        <span class="dashboard-command-note">Current average score across saved peer reviews.</span>
+      </div>
+      <div class="peer-rating-stat">
+        <span class="dashboard-command-label">Participation</span>
+        <strong class="dashboard-command-value">${escapeHtml(`${safeSummary.participationCount}/${members.length}`)}</strong>
+        <span class="dashboard-command-note">Members who have submitted at least one teammate rating.</span>
+      </div>
+      <div class="peer-rating-stat">
+        <span class="dashboard-command-label">Saved Reviews</span>
+        <strong class="dashboard-command-value">${escapeHtml(String(safeSummary.totalRatings || 0))}</strong>
+        <span class="dashboard-command-note">Numeric peer reviews currently stored for this workspace.</span>
+      </div>
+    </div>
+  `;
+
+  list.innerHTML = safeMembers.map((member) => {
+    const myRating = peerRatingsData.currentUserRatings?.[member.userId]?.score || "";
+    return `
+      <article class="peer-rating-row">
+        <div class="peer-rating-row-copy">
+          <strong>${escapeHtml(member.name)}</strong>
+          <span>${escapeHtml(member.role || "Member")}</span>
+        </div>
+        <div class="peer-rating-row-metrics">
+          <span class="peer-rating-score">${escapeHtml(formatRatingValue(member.averageScore))}</span>
+          <span class="peer-rating-note">${escapeHtml(`${member.reviewCount} review${member.reviewCount === 1 ? "" : "s"}`)}</span>
+          ${myRating ? `<span class="status-pill subtle">You rated ${escapeHtml(String(myRating))}/5</span>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderPeerRatingForm() {
+  const list = document.getElementById("peer-rating-form-list");
+  if (!list) {
+    return;
+  }
+
+  const members = Array.isArray(teamData?.members) ? teamData.members : [];
+  const peers = members.filter((member) => member.userId !== currentUser?.id);
+
+  if (peers.length === 0) {
+    list.innerHTML = `<div class="team-empty">There are no teammates to rate yet.</div>`;
+    return;
+  }
+
+  list.innerHTML = peers.map((member) => {
+    const savedRating = peerRatingsData.currentUserRatings?.[member.userId] || {};
+    return `
+      <article class="peer-rating-form-card" data-rated-user-id="${escapeHtml(member.userId)}">
+        <div class="peer-rating-form-head">
+          <div>
+            <strong>${escapeHtml(member.name)}</strong>
+            <p class="contribution-panel-copy">${escapeHtml(member.role || "Member")}</p>
+          </div>
+          <span class="status-pill subtle">Update anytime</span>
+        </div>
+        <div class="modal-field">
+          <label>Score</label>
+          <select class="modal-select peer-rating-score-input">
+            <option value="">Not rated yet</option>
+            <option value="5" ${savedRating.score === 5 ? "selected" : ""}>5 - Outstanding</option>
+            <option value="4" ${savedRating.score === 4 ? "selected" : ""}>4 - Strong</option>
+            <option value="3" ${savedRating.score === 3 ? "selected" : ""}>3 - Solid</option>
+            <option value="2" ${savedRating.score === 2 ? "selected" : ""}>2 - Needs support</option>
+            <option value="1" ${savedRating.score === 1 ? "selected" : ""}>1 - Blocked</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Quick note (optional)</label>
+          <textarea class="modal-textarea peer-rating-feedback-input" rows="2" maxlength="240" placeholder="What stood out about their contribution?">${escapeHtml(savedRating.feedback || "")}</textarea>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderWeeklyReportPreview() {
+  const preview = document.getElementById("weekly-report-preview");
+  const period = document.getElementById("weekly-report-period-label");
+  if (!preview || !period) {
+    return;
+  }
+
+  if (!teamData) {
+    period.textContent = "No active workspace";
+    preview.innerHTML = `<div class="team-empty">Connect to a workspace to generate a weekly progress report.</div>`;
+    return;
+  }
+
+  if (!weeklyReportData) {
+    period.textContent = "Generating latest summary...";
+    preview.innerHTML = `
+      <div class="weekly-report-loading">
+        <span class="contribution-legend-skeleton"></span>
+        <span class="contribution-legend-skeleton"></span>
+      </div>
+    `;
+    return;
+  }
+
+  period.textContent = weeklyReportData.periodLabel;
+  const summary = weeklyReportData.summary || {};
+  const highlights = Array.isArray(weeklyReportData.highlights) ? weeklyReportData.highlights.slice(0, 2) : [];
+
+  preview.innerHTML = `
+    <div class="weekly-report-hero">
+      <strong>${escapeHtml(summary.headline || "No weekly activity yet.")}</strong>
+      <p class="task-lock-note">Generated from live tasks, chat activity, and peer review data for this workspace.</p>
+    </div>
+    <div class="weekly-report-metric-grid">
+      <article class="weekly-report-metric-card">
+        <span class="dashboard-command-label">Created</span>
+        <strong class="dashboard-command-value">${escapeHtml(String(summary.createdThisWeek || 0))}</strong>
+      </article>
+      <article class="weekly-report-metric-card">
+        <span class="dashboard-command-label">Completed</span>
+        <strong class="dashboard-command-value">${escapeHtml(String(summary.completedThisWeek || 0))}</strong>
+      </article>
+      <article class="weekly-report-metric-card">
+        <span class="dashboard-command-label">Overdue</span>
+        <strong class="dashboard-command-value">${escapeHtml(String(summary.overdueCount || 0))}</strong>
+      </article>
+      <article class="weekly-report-metric-card">
+        <span class="dashboard-command-label">Peer Avg</span>
+        <strong class="dashboard-command-value">${escapeHtml(formatRatingValue(summary.peerRatingAverage))}</strong>
+      </article>
+    </div>
+    <div class="weekly-report-highlight-list">
+      ${highlights.length === 0
+        ? '<div class="deadline-reminder-empty"><strong class="task-empty-title">No recent wins yet</strong><p class="task-empty-copy">As tasks close out this week, they will appear here for a quick recap.</p></div>'
+        : highlights.map((item) => `
+          <article class="weekly-report-highlight-card">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.completedAt || "Completed recently")}</span>
+          </article>
+        `).join("")}
+    </div>
+  `;
+}
+
+function renderWeeklyReportModal() {
+  const content = document.getElementById("weekly-report-content");
+  if (!content) {
+    return;
+  }
+
+  if (!teamData) {
+    content.innerHTML = `<div class="team-empty">No workspace selected yet.</div>`;
+    return;
+  }
+
+  if (!weeklyReportData) {
+    content.innerHTML = `<div class="team-empty">Generating the latest report...</div>`;
+    return;
+  }
+
+  const summary = weeklyReportData.summary || {};
+  const memberBreakdown = Array.isArray(weeklyReportData.memberBreakdown)
+    ? weeklyReportData.memberBreakdown
+    : [];
+  const highlights = Array.isArray(weeklyReportData.highlights)
+    ? weeklyReportData.highlights
+    : [];
+  const attention = Array.isArray(weeklyReportData.attention)
+    ? weeklyReportData.attention
+    : [];
+
+  content.innerHTML = `
+    <div class="weekly-report-section">
+      <div class="weekly-report-summary-grid">
+        <article class="weekly-report-summary-card">
+          <span class="dashboard-command-label">Created</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.createdThisWeek || 0))}</strong>
+          <span class="dashboard-command-note">New tasks added in the last 7 days.</span>
+        </article>
+        <article class="weekly-report-summary-card">
+          <span class="dashboard-command-label">Completed</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.completedThisWeek || 0))}</strong>
+          <span class="dashboard-command-note">Tasks closed during this reporting window.</span>
+        </article>
+        <article class="weekly-report-summary-card">
+          <span class="dashboard-command-label">Messages</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.chatMessagesThisWeek || 0))}</strong>
+          <span class="dashboard-command-note">Workspace chat updates captured this week.</span>
+        </article>
+        <article class="weekly-report-summary-card">
+          <span class="dashboard-command-label">Peer Rating</span>
+          <strong class="dashboard-command-value">${escapeHtml(formatRatingValue(summary.peerRatingAverage))}</strong>
+          <span class="dashboard-command-note">Average saved peer rating across the current team.</span>
+        </article>
+      </div>
+    </div>
+    <div class="weekly-report-section">
+      <h4 class="sidebar-title">Wins</h4>
+      <div class="weekly-report-list">
+        ${highlights.length === 0
+          ? '<div class="team-empty">No completed tasks were logged in this window.</div>'
+          : highlights.map((item) => `
+            <article class="weekly-report-list-card">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.assignees?.join(", ") || "Team")} · ${escapeHtml(item.completedAt || "Completed recently")}</span>
+            </article>
+          `).join("")}
+      </div>
+    </div>
+    <div class="weekly-report-section">
+      <h4 class="sidebar-title">Needs Attention</h4>
+      <div class="weekly-report-list">
+        ${attention.length === 0
+          ? '<div class="team-empty">No urgent blockers are flagged right now.</div>'
+          : attention.map((item) => `
+            <article class="weekly-report-list-card">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span>${escapeHtml(item.dueLabel)} · ${escapeHtml(item.assignees?.join(", ") || "Team")}</span>
+            </article>
+          `).join("")}
+      </div>
+    </div>
+    <div class="weekly-report-section">
+      <h4 class="sidebar-title">Member Breakdown</h4>
+      <div class="weekly-report-member-grid">
+        ${memberBreakdown.length === 0
+          ? '<div class="team-empty">No teammate activity is available yet.</div>'
+          : memberBreakdown.map((member) => `
+            <article class="weekly-report-member-card">
+              <div class="weekly-report-member-head">
+                <div>
+                  <strong>${escapeHtml(member.name)}</strong>
+                  <span>${escapeHtml(member.role || "Member")}</span>
+                </div>
+                <span class="status-pill subtle">${escapeHtml(formatRatingValue(member.averagePeerRating))}</span>
+              </div>
+              <div class="weekly-report-member-stats">
+                <span>${escapeHtml(String(member.completedThisWeek || 0))} completed</span>
+                <span>${escapeHtml(String(member.activeAssignments || 0))} active</span>
+                <span>${escapeHtml(String(member.createdThisWeek || 0))} created</span>
+              </div>
+            </article>
+          `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+async function loadPeerRatings() {
+  try {
+    if (!teamData?.id) {
+      peerRatingsData = {
+        currentUserRatings: {},
+        members: [],
+        summary: {
+          eligibleRaters: 0,
+          participationCount: 0,
+          teamAverageScore: 0,
+          totalRatings: 0
+        }
+      };
+      renderPeerRatingPanel();
+      return;
+    }
+
+    const payload = await request("/api/peer-ratings", { method: "GET" });
+    peerRatingsData = payload.peerRatings || peerRatingsData;
+    renderPeerRatingPanel();
+  } catch (error) {
+    console.error("Failed to load peer ratings", error);
+    renderPeerRatingPanel();
+  }
+}
+
+async function loadWeeklyReport() {
+  try {
+    if (!teamData?.id) {
+      weeklyReportData = null;
+      renderWeeklyReportPreview();
+      renderWeeklyReportModal();
+      return;
+    }
+
+    const payload = await request("/api/weekly-report", { method: "GET" });
+    weeklyReportData = payload.report || null;
+    renderWeeklyReportPreview();
+    renderWeeklyReportModal();
+  } catch (error) {
+    console.error("Failed to load weekly report", error);
+    renderWeeklyReportPreview();
+    renderWeeklyReportModal();
+  }
 }
 
 async function bootstrap() {
   try {
     renderContributionTracker();
+    renderDeadlineReminderPanel();
+    renderPeerRatingPanel();
+    renderWeeklyReportPreview();
     
     // Add user chip content
     const chip = document.getElementById("nav-user-chip");
@@ -714,7 +1327,7 @@ async function bootstrap() {
     }
     
     await loadTeam();
-    await Promise.all([loadTasks(), loadArchivedTasks(), loadMessages()]);
+    await Promise.all([loadTasks(), loadArchivedTasks(), loadMessages(), loadPeerRatings(), loadWeeklyReport()]);
   } catch (err) {
     console.error("Not logged in!", err);
     navigate("/index.html");
@@ -736,6 +1349,9 @@ async function loadTeam() {
     if(ctxName) ctxName.textContent = teamData?.projectTitle || teamData?.name || "Workspace";
     if(ctxMeta) ctxMeta.textContent = teamData?.name ? `${teamData.name} • ${teamData.members?.length || 0} members` : "Connected";
     renderWorkspaceOverview();
+    renderDeadlineReminderPanel();
+    renderPeerRatingPanel();
+    renderWeeklyReportPreview();
 
     if(!teamList) return;
     
@@ -761,6 +1377,7 @@ async function loadTeam() {
         addTaskButton.title = "Join or create a team to manage tasks";
       }
       syncTaskAssigneeOptions([], false);
+      renderReminderCenter();
       updateContributionSourceState("team", "success");
       return;
     }
@@ -793,6 +1410,8 @@ async function loadTeam() {
 
     renderTasks();
     renderArchivedTasks();
+    renderDeadlineReminderPanel();
+    renderReminderCenter();
     updateContributionSourceState("team", "success");
   } catch(e) {
     console.error("Failed to load team");
@@ -810,6 +1429,8 @@ async function loadTasks() {
       : [];
     renderTasks();
     renderWorkspaceOverview();
+    renderDeadlineReminderPanel();
+    renderReminderCenter();
     updateContributionSourceState("tasks", "success");
   } catch(e) {
     console.error("Failed to load tasks");
@@ -826,6 +1447,8 @@ async function loadArchivedTasks() {
       : [];
     renderArchivedTasks();
     renderWorkspaceOverview();
+    renderDeadlineReminderPanel();
+    renderReminderCenter();
     updateContributionSourceState("archived", "success");
   } catch (e) {
     console.error("Failed to load archived tasks");
@@ -919,15 +1542,17 @@ function renderTasks() {
     // Due date badge logic
     let deadlineBadge = "";
     if (task.deadline) {
-      const now = new Date();
-      const due = new Date(task.deadline);
-      const diffHours = (due - now) / (1000 * 60 * 60);
-      const label = due.toLocaleDateString([], { month: "short", day: "numeric" });
-      let cls = "deadline-ok";
-      let icon = "📅";
-      if (diffHours < 0) { cls = "deadline-overdue"; icon = "⚠️"; }
-      else if (diffHours < 24) { cls = "deadline-soon"; icon = "⏰"; }
-      deadlineBadge = `<div class="task-deadline ${cls}">${icon} Due ${label}</div>`;
+      const now = Date.now();
+      const due = parseDeadlineValue(task.deadline);
+      if (due) {
+        const diffHours = (due.getTime() - now) / (1000 * 60 * 60);
+        const label = due.toLocaleDateString([], { month: "short", day: "numeric" });
+        let cls = "deadline-ok";
+        let icon = "Due";
+        if (diffHours < 0) { cls = "deadline-overdue"; icon = "Overdue"; }
+        else if (diffHours < 24) { cls = "deadline-soon"; icon = "Soon"; }
+        deadlineBadge = `<div class="task-deadline ${cls}">${escapeHtml(icon)} ${escapeHtml(label)}</div>`;
+      }
     }
 
     div.innerHTML = `
@@ -1020,6 +1645,7 @@ window.updateTaskStatus = async (taskId, newStatus) => {
     await request("/api/tasks/" + taskId, { method: "PUT", body: JSON.stringify({ status: newStatus }) });
     loadTasks();
     loadArchivedTasks();
+    loadWeeklyReport();
   } catch(e) { showToast("Failed to move task. " + e.message, "error"); }
 };
 
@@ -1041,6 +1667,7 @@ window.deleteTask = async (taskId) => {
         renderTasks();
         loadTasks();
         loadArchivedTasks();
+        loadWeeklyReport();
       } catch(e) { showToast("Failed to delete task. " + e.message, "error"); }
     }
   });
@@ -1063,6 +1690,7 @@ window.deleteArchivedTask = async (taskId) => {
         archivedTasksData = archivedTasksData.filter((task) => task.id !== taskId);
         renderArchivedTasks();
         loadArchivedTasks();
+        loadWeeklyReport();
       } catch(e) { showToast("Failed to delete archived task. " + e.message, "error"); }
     }
   });
@@ -1171,6 +1799,19 @@ const taskSubmitBtn = document.getElementById("task-submit-btn");
 const confirmModal = document.getElementById("confirm-modal");
 const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
 const confirmConfirmBtn = document.getElementById("confirm-confirm-btn");
+const deadlineModal = document.getElementById("deadline-modal");
+const openReminderCenterBtn = document.getElementById("open-reminders-btn");
+const closeReminderCenterBtn = document.getElementById("close-deadline-modal");
+const peerRatingModal = document.getElementById("peer-rating-modal");
+const openPeerRatingBtn = document.getElementById("open-peer-rating-btn");
+const closePeerRatingBtn = document.getElementById("close-peer-rating-modal");
+const peerRatingForm = document.getElementById("peer-rating-form");
+const peerRatingSubmitBtn = document.getElementById("peer-rating-submit-btn");
+const weeklyReportModal = document.getElementById("weekly-report-modal");
+const openWeeklyReportBtn = document.getElementById("open-weekly-report-btn");
+const refreshWeeklyReportBtn = document.getElementById("refresh-weekly-report-btn");
+const closeWeeklyReportBtn = document.getElementById("close-weekly-report-modal");
+const copyWeeklyReportBtn = document.getElementById("copy-weekly-report-btn");
 
 function resetTaskModalState() {
   taskModalMode = "create";
@@ -1224,6 +1865,11 @@ function openTaskModal(mode = "create", task = null) {
 
     document.getElementById("task-title").value = task.title || "";
     document.getElementById("task-desc").value = task.description || "";
+    document.getElementById("task-deadline").value = formatDeadlineInputValue(task.deadline);
+    const priorityValue = String(task.priority || "Medium").trim();
+    document.getElementById("task-priority").value = ["Low", "Medium", "High"].includes(priorityValue)
+      ? priorityValue
+      : "Medium";
     syncTaskAssigneeOptions(getTaskAssigneeMemberIds(task), true, task.status);
   } else {
     resetTaskModalState();
@@ -1269,8 +1915,12 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
     e.preventDefault();
     const titleInput = document.getElementById("task-title");
     const descriptionInput = document.getElementById("task-desc");
+    const deadlineInput = document.getElementById("task-deadline");
+    const priorityInput = document.getElementById("task-priority");
     const title = String(titleInput?.value || "").trim();
     const description = String(descriptionInput?.value || "").trim();
+    const deadline = String(deadlineInput?.value || "").trim();
+    const priority = String(priorityInput?.value || "Medium").trim();
     const isEditMode = taskModalMode === "edit";
     const editingTask = isEditMode ? findTaskById(editingTaskId) : null;
 
@@ -1304,7 +1954,7 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
       if (isEditMode && editingTaskId) {
         const payload = await request("/api/tasks/" + editingTaskId, {
           method: "PUT",
-          body: JSON.stringify({ title, description, ...assigneePayload })
+          body: JSON.stringify({ title, description, deadline, priority, ...assigneePayload })
         });
         const updatedTask = normalizeTask(payload.task);
 
@@ -1315,7 +1965,7 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
       } else {
         const payload = await request("/api/tasks", {
           method: "POST",
-          body: JSON.stringify({ title, description, ...assigneePayload })
+          body: JSON.stringify({ title, description, deadline, priority, ...assigneePayload })
         });
         const createdTask = normalizeTask(payload.task);
 
@@ -1330,6 +1980,7 @@ if(addTaskBtn && taskModal && closeTaskBtn && taskForm) {
       }
       loadTasks();
       loadArchivedTasks();
+      loadWeeklyReport();
       showToast(isEditMode ? "Task updated." : "Task created.", "success");
     } catch(err) {
       showToast(`Failed to ${isEditMode ? "save" : "create"} task. ` + err.message, "error");
@@ -1360,6 +2011,105 @@ if (confirmModal && confirmCancelBtn && confirmConfirmBtn) {
     }
   };
   confirmModal.onclose = resetConfirmModalState;
+}
+
+if (openReminderCenterBtn && deadlineModal && closeReminderCenterBtn) {
+  openReminderCenterBtn.addEventListener("click", () => {
+    renderReminderCenter();
+    if (!deadlineModal.open) {
+      deadlineModal.showModal();
+    }
+  });
+  closeReminderCenterBtn.addEventListener("click", () => deadlineModal.close());
+}
+
+if (openPeerRatingBtn && peerRatingModal && closePeerRatingBtn) {
+  openPeerRatingBtn.addEventListener("click", async () => {
+    await loadPeerRatings();
+    renderPeerRatingForm();
+    if (!peerRatingModal.open) {
+      peerRatingModal.showModal();
+    }
+  });
+  closePeerRatingBtn.addEventListener("click", () => peerRatingModal.close());
+}
+
+if (peerRatingForm && peerRatingSubmitBtn) {
+  peerRatingForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const ratingCards = document.querySelectorAll(".peer-rating-form-card");
+    const ratings = Array.from(ratingCards).map((card) => {
+      const ratedUserId = String(card.getAttribute("data-rated-user-id") || "").trim();
+      const score = String(card.querySelector(".peer-rating-score-input")?.value || "").trim();
+      const feedback = String(card.querySelector(".peer-rating-feedback-input")?.value || "").trim();
+      return {
+        feedback,
+        ratedUserId,
+        score: score ? Number(score) : null
+      };
+    }).filter((entry) => entry.ratedUserId && (entry.score || entry.feedback));
+
+    if (ratings.length === 0) {
+      showToast("Choose at least one teammate score before saving.", "error");
+      return;
+    }
+
+    peerRatingSubmitBtn.disabled = true;
+    peerRatingSubmitBtn.classList.add("is-loading");
+
+    try {
+      await request("/api/peer-ratings", {
+        method: "PUT",
+        body: JSON.stringify({ ratings })
+      });
+      await loadPeerRatings();
+      await loadWeeklyReport();
+      renderPeerRatingForm();
+      showToast("Peer ratings saved.", "success");
+      if (peerRatingModal.open) {
+        peerRatingModal.close();
+      }
+    } catch (error) {
+      showToast("Failed to save peer ratings. " + error.message, "error");
+    } finally {
+      peerRatingSubmitBtn.disabled = false;
+      peerRatingSubmitBtn.classList.remove("is-loading");
+    }
+  });
+}
+
+async function copyWeeklyReportToClipboard() {
+  if (!weeklyReportData?.plainText) {
+    showToast("Generate the weekly report before copying it.", "error");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(weeklyReportData.plainText);
+    showToast("Weekly report copied.", "success");
+  } catch {
+    showToast("Copy failed on this browser.", "error");
+  }
+}
+
+if (openWeeklyReportBtn && weeklyReportModal && closeWeeklyReportBtn) {
+  openWeeklyReportBtn.addEventListener("click", async () => {
+    await loadWeeklyReport();
+    renderWeeklyReportModal();
+    if (!weeklyReportModal.open) {
+      weeklyReportModal.showModal();
+    }
+  });
+  closeWeeklyReportBtn.addEventListener("click", () => weeklyReportModal.close());
+}
+
+if (refreshWeeklyReportBtn) {
+  refreshWeeklyReportBtn.addEventListener("click", () => loadWeeklyReport());
+}
+
+if (copyWeeklyReportBtn) {
+  copyWeeklyReportBtn.addEventListener("click", () => copyWeeklyReportToClipboard());
 }
 
 // Chat logic
@@ -1502,7 +2252,6 @@ bootstrap();
 
     return () => {
       document.removeEventListener('click', handleGlobalClick);
-      window.URLSearchParams = originalURLSearchParams; // restore
       if (window._chatPollInterval) {
         clearInterval(window._chatPollInterval);
         window._chatPollInterval = null;
@@ -1655,6 +2404,18 @@ bootstrap();
         </div>
 
         <div className="dashboard-lower-grid">
+          <div className="dashboard-panel deadline-panel">
+            <div className="deadline-panel-head">
+              <div>
+                <h3 className="sidebar-title">Deadline Reminders</h3>
+                <p id="deadline-reminder-subtitle" className="contribution-panel-copy">Tracking upcoming deadlines and overdue work.</p>
+              </div>
+              <button type="button" id="open-reminders-btn" className="btn btn-ghost">Open Center</button>
+            </div>
+            <div id="deadline-reminder-stats" className="deadline-stat-grid"></div>
+            <div id="deadline-reminder-list" className="deadline-reminder-list"></div>
+          </div>
+
           <div className="dashboard-panel team-panel">
             <h3 className="sidebar-title">Group Members</h3>
             <div id="team-list" className="team-list"></div>
@@ -1704,6 +2465,35 @@ bootstrap();
           </section>
           <div id="analytics-bars" className="contribution-member-list"></div>
         </div>
+
+        <div className="contribution-secondary-grid">
+          <section className="dashboard-panel contribution-panel">
+            <div className="contribution-panel-head contribution-panel-head-split">
+              <div>
+                <h2 className="board-title">Peer Rating System</h2>
+                <p className="contribution-panel-copy">Collect fair teammate feedback without changing the rest of the workspace flow.</p>
+              </div>
+              <button type="button" id="open-peer-rating-btn" className="btn btn-primary">Rate Teammates</button>
+            </div>
+            <div id="peer-rating-summary"></div>
+            <div id="peer-rating-list" className="peer-rating-list"></div>
+          </section>
+
+          <section className="dashboard-panel contribution-panel">
+            <div className="contribution-panel-head contribution-panel-head-split">
+              <div>
+                <h2 className="board-title">Weekly Progress Report</h2>
+                <p className="contribution-panel-copy">A one-click summary of delivery, blockers, chat activity, and peer review participation.</p>
+              </div>
+              <div className="feature-button-row">
+                <button type="button" id="refresh-weekly-report-btn" className="btn btn-ghost">Refresh</button>
+                <button type="button" id="open-weekly-report-btn" className="btn btn-primary">Open Report</button>
+              </div>
+            </div>
+            <p id="weekly-report-period-label" className="task-lock-note">Generating latest summary...</p>
+            <div id="weekly-report-preview"></div>
+          </section>
+        </div>
       </section>
 
       
@@ -1752,6 +2542,20 @@ bootstrap();
         <label>Details</label>
         <textarea className="modal-textarea" id="task-desc" rows="3"></textarea>
       </div>
+      <div className="task-modal-grid">
+        <div className="modal-field">
+          <label>Deadline</label>
+          <input className="modal-input" type="date" id="task-deadline" />
+        </div>
+        <div className="modal-field">
+          <label>Priority</label>
+          <select className="modal-select" id="task-priority" defaultValue="Medium">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </div>
+      </div>
       <div className="modal-field">
         <label>Assign To</label>
         <div id="task-assignees-container" className="checkbox-list"></div>
@@ -1761,6 +2565,54 @@ bootstrap();
         <button type="submit" id="task-submit-btn" className="btn btn-primary">Create Task</button>
       </div>
     </form>
+    </div>
+  </dialog>
+
+  <dialog id="deadline-modal">
+    <div className="modal-shell feature-modal-shell">
+      <div className="modal-header">
+        <div>
+          <h3 className="modal-title">Deadline Reminder Center</h3>
+          <p className="modal-subtitle">A focused list of overdue work, next-up due dates, and the active workspace milestone.</p>
+        </div>
+        <button type="button" id="close-deadline-modal" className="btn btn-ghost">Close</button>
+      </div>
+      <div id="deadline-modal-content"></div>
+    </div>
+  </dialog>
+
+  <dialog id="peer-rating-modal">
+    <div className="modal-shell feature-modal-shell">
+      <div className="modal-header">
+        <div>
+          <h3 className="modal-title">Peer Rating System</h3>
+          <p className="modal-subtitle">Save 1-5 collaboration scores for each teammate. The dashboard shows team averages only, and you can revise your scores later.</p>
+        </div>
+        <button type="button" id="close-peer-rating-modal" className="btn btn-ghost">Close</button>
+      </div>
+      <form id="peer-rating-form" className="modal-form">
+        <div id="peer-rating-form-list" className="peer-rating-form-list"></div>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={() => document.getElementById('peer-rating-modal').close()}>Cancel</button>
+          <button type="submit" id="peer-rating-submit-btn" className="btn btn-primary">Save Ratings</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="weekly-report-modal">
+    <div className="modal-shell feature-modal-shell report-modal-shell">
+      <div className="modal-header">
+        <div>
+          <h3 className="modal-title">Weekly Progress Report</h3>
+          <p className="modal-subtitle">Generated from current workspace activity so you can share a clean weekly snapshot without leaving CollabSpace.</p>
+        </div>
+        <div className="feature-button-row">
+          <button type="button" id="copy-weekly-report-btn" className="btn btn-ghost">Copy</button>
+          <button type="button" id="close-weekly-report-modal" className="btn btn-ghost">Close</button>
+        </div>
+      </div>
+      <div id="weekly-report-content"></div>
     </div>
   </dialog>
   

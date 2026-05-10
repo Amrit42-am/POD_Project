@@ -6,12 +6,16 @@ import https from "https";
 import path from "path";
 import { fileURLToPath } from "url";
 import { MongoClient } from "mongodb";
+import {
+  buildTeamPeerRatingSnapshot,
+  buildWeeklyProgressReport,
+  parseDeadlineTimestamp
+} from "./insights.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || "127.0.0.1";
+
 const SESSION_COOKIE = "collabspace_session";
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 30;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -77,6 +81,9 @@ const MIME_TYPES = {
 /* ── MongoDB Connection ──────────────────────────────── */
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB_NAME = String(
+  process.env.MONGODB_DB_NAME || "collabspace"
+).trim() || "collabspace";
 if (!MONGODB_URI) {
   console.error("FATAL: MONGODB_URI environment variable is not set.");
   process.exit(1);
@@ -89,8 +96,8 @@ async function connectToDatabase() {
   if (db) return db;
   try {
     await mongoClient.connect();
-    db = mongoClient.db("collabspace");
-    console.log("✅ Connected to MongoDB Atlas (collabspace)");
+    db = mongoClient.db(MONGODB_DB_NAME);
+    console.log(`✅ Connected to MongoDB Atlas (${MONGODB_DB_NAME})`);
     return db;
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
@@ -235,6 +242,11 @@ async function ensureIndexes() {
   await database.collection("teams").createIndex({ id: 1 }, { unique: true });
   await database.collection("tasks").createIndex({ id: 1 }, { unique: true });
   await database.collection("messages").createIndex({ id: 1 }, { unique: true });
+  await database.collection("peerRatings").createIndex(
+    { teamId: 1, raterId: 1, ratedUserId: 1 },
+    { unique: true }
+  );
+  await database.collection("peerRatings").createIndex({ teamId: 1, updatedAt: -1 });
   console.log("✅ MongoDB indexes ensured");
 }
 
@@ -264,15 +276,21 @@ async function readMessages() {
   return docs.map(({ _id, ...rest }) => rest);
 }
 
+async function readPeerRatings() {
+  const col = await getCollection("peerRatings");
+  const docs = await col.find({}).toArray();
+  return docs.map(({ _id, ...rest }) => rest);
+}
+
 // Atomic write helpers
 async function insertDoc(collectionName, doc) {
   const col = await getCollection(collectionName);
   await col.insertOne(doc);
 }
 
-async function updateDoc(collectionName, filter, update) {
+async function updateDoc(collectionName, filter, update, options = {}) {
   const col = await getCollection(collectionName);
-  await col.updateOne(filter, update);
+  await col.updateOne(filter, update, options);
 }
 
 async function deleteDoc(collectionName, filter) {
@@ -621,6 +639,13 @@ function normalizeProfileText(value, maxLength = 480) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, maxLength);
+}
+
+function normalizePeerRatingFeedback(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
 }
 
 function normalizeProfileTagList(values, maxItems = 12, maxLength = 32) {
@@ -1699,6 +1724,174 @@ async function handlePostMessage(req, res) {
   }
 }
 
+/* ── Peer ratings ────────────────────────────────────── */
+
+async function handleGetPeerRatings(req, res) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) { sendJson(res, 401, { error: "Not authenticated." }); return; }
+
+  const teamId = getRequestedTeamId(req);
+  const teams = await readTeams();
+  const team = findUserTeam(teams, user.id, teamId);
+  if (!team) { sendJson(res, 403, { error: "Access denied." }); return; }
+
+  const ratings = await readPeerRatings();
+  const peerRatings = buildTeamPeerRatingSnapshot(team, ratings, user.id);
+  sendJson(res, 200, { peerRatings });
+}
+
+async function handleUpsertPeerRatings(req, res) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) { sendJson(res, 401, { error: "Not authenticated." }); return; }
+
+  try {
+    const body = await readJsonBody(req);
+    const teamId = getRequestedTeamId(req, body);
+    const teams = await readTeams();
+    const team = findUserTeam(teams, user.id, teamId);
+    if (!team) {
+      sendJson(res, 403, { error: "Access denied." });
+      return;
+    }
+
+    const ratings = Array.isArray(body.ratings) ? body.ratings : [];
+    if (ratings.length === 0) {
+      sendJson(res, 400, { error: "At least one rating is required." });
+      return;
+    }
+
+    const memberLookup = new Map(
+      (Array.isArray(team.members) ? team.members : [])
+        .map((member) => [String(member.userId || "").trim(), member])
+        .filter(([memberId]) => memberId)
+    );
+    const raterMember = memberLookup.get(user.id);
+
+    if (memberLookup.size <= 1) {
+      sendJson(res, 400, { error: "Peer ratings need at least two team members." });
+      return;
+    }
+
+    const dedupedRatings = new Map();
+
+    ratings.forEach((entry) => {
+      const ratedUserId = String(entry?.ratedUserId || "").trim();
+      const numericScore = Number(entry?.score);
+      const score = Number.isInteger(numericScore) ? numericScore : null;
+      const feedback = normalizePeerRatingFeedback(entry?.feedback);
+
+      if (!ratedUserId) {
+        return;
+      }
+
+      dedupedRatings.set(ratedUserId, { feedback, ratedUserId, score });
+    });
+
+    const sanitizedRatings = [];
+
+    for (const rating of dedupedRatings.values()) {
+      if (rating.ratedUserId === user.id) {
+        sendJson(res, 400, { error: "You cannot rate yourself." });
+        return;
+      }
+
+      if (!memberLookup.has(rating.ratedUserId)) {
+        sendJson(res, 400, { error: "Ratings must target current team members only." });
+        return;
+      }
+
+      if (!Number.isInteger(rating.score) || rating.score < 1 || rating.score > 5) {
+        if (rating.score === null && !rating.feedback) {
+          continue;
+        }
+
+        sendJson(res, 400, { error: "Each peer rating score must be between 1 and 5." });
+        return;
+      }
+
+      sanitizedRatings.push(rating);
+    }
+
+    if (sanitizedRatings.length === 0) {
+      sendJson(res, 400, { error: "Choose at least one teammate and score before saving." });
+      return;
+    }
+
+    const updatedAt = new Date().toISOString();
+
+    for (const rating of sanitizedRatings) {
+      const ratedMember = memberLookup.get(rating.ratedUserId);
+      await updateDoc(
+        "peerRatings",
+        {
+          ratedUserId: rating.ratedUserId,
+          raterId: user.id,
+          teamId: team.id
+        },
+        {
+          $set: {
+            feedback: rating.feedback,
+            ratedUserName: String(ratedMember?.name || "").trim(),
+            ratedUserRole: String(ratedMember?.role || "Member").trim(),
+            raterName: String(user.name || "").trim(),
+            raterRole: String(raterMember?.role || "Member").trim(),
+            score: rating.score,
+            teamId: String(team.id || "").trim(),
+            teamName: String(team.name || "").trim(),
+            updatedAt
+          },
+          $setOnInsert: {
+            createdAt: updatedAt,
+            id: crypto.randomUUID()
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    const peerRatings = buildTeamPeerRatingSnapshot(
+      team,
+      await readPeerRatings(),
+      user.id
+    );
+
+    sendJson(res, 200, {
+      message: "Peer ratings saved.",
+      peerRatings
+    });
+  } catch {
+    sendJson(res, 400, { error: "Could not save peer ratings." });
+  }
+}
+
+/* ── Weekly progress report ──────────────────────────── */
+
+async function handleGetWeeklyReport(req, res) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) { sendJson(res, 401, { error: "Not authenticated." }); return; }
+
+  const teamId = getRequestedTeamId(req);
+  const teams = await readTeams();
+  const team = findUserTeam(teams, user.id, teamId);
+  if (!team) { sendJson(res, 403, { error: "Access denied." }); return; }
+
+  const [tasks, messages, ratings] = await Promise.all([
+    readTasks(),
+    readMessages(),
+    readPeerRatings()
+  ]);
+
+  const report = buildWeeklyProgressReport({
+    messages,
+    now: new Date(),
+    ratings,
+    tasks,
+    team
+  });
+
+  sendJson(res, 200, { report });
+}
+
 /* ── Analytics endpoint ──────────────────────────────── */
 
 async function handleGetAnalytics(req, res) {
@@ -1720,7 +1913,11 @@ async function handleGetAnalytics(req, res) {
   const completed = teamTasks.filter((t) => normalizeTaskStatus(t.status) === "Done").length;
   const inProgress = teamTasks.filter((t) => normalizeTaskStatus(t.status) === "In Progress").length;
   const todo = teamTasks.filter((t) => normalizeTaskStatus(t.status) === "To Do").length;
-  const overdue = teamTasks.filter((t) => t.deadline && new Date(t.deadline) < new Date() && normalizeTaskStatus(t.status) !== "Done").length;
+  const nowTs = Date.now();
+  const overdue = teamTasks.filter((t) => {
+    const deadlineTs = parseDeadlineTimestamp(t.deadline);
+    return deadlineTs !== null && deadlineTs < nowTs && normalizeTaskStatus(t.status) !== "Done";
+  }).length;
 
   // Contribution per member
   const contributions = {};
@@ -1926,6 +2123,21 @@ export default async function handler(req, res) {
 
     if (req.method === "POST" && pathname === "/api/messages") {
       await handlePostMessage(req, res);
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/peer-ratings") {
+      await handleGetPeerRatings(req, res);
+      return;
+    }
+
+    if (req.method === "PUT" && pathname === "/api/peer-ratings") {
+      await handleUpsertPeerRatings(req, res);
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/weekly-report") {
+      await handleGetWeeklyReport(req, res);
       return;
     }
 
