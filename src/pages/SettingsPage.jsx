@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from '../components/ThemeToggle';
+import logoImg from '../images/Logo.png';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -317,8 +318,8 @@ export default function SettingsPage() {
       <aside className="app-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand" data-navigate="/">
-            <div className="brand-mark">C</div>
-            CollabSpace
+            <img src={logoImg} alt="CollabSpace Logo" className="brand-logo" style={{ height: '32px', width: 'auto', transform: 'scale(2.5)', transformOrigin: 'left center', marginRight: '25px' }} />
+            <span style={{ zIndex: 1, position: 'relative' }}>CollabSpace</span>
           </div>
         </div>
         

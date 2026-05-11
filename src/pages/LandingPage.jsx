@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CollabNodesBackground from '../components/CollabNodesBackground';
 import ThemeToggle from '../components/ThemeToggle';
+import logoImg from '../images/Logo.png';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -468,8 +469,8 @@ export default function LandingPage() {
       <header className="site-header">
         <div className="shell header-shell">
           <a className="brand" href="/">
-            <span className="brand-mark">C</span>
-            <span className="brand-copy"><strong>CollabSpace</strong></span>
+            <img src={logoImg} alt="CollabSpace Logo" className="brand-logo" style={{ height: '32px', width: 'auto', transform: 'scale(2.5)', transformOrigin: 'left center', marginRight: '25px' }} />
+            <span className="brand-copy" style={{ zIndex: 1, position: 'relative' }}><strong>CollabSpace</strong></span>
           </a>
           <nav className="site-nav" aria-label="Main navigation">
             <a href="#problem">Problem</a>
@@ -614,7 +615,10 @@ export default function LandingPage() {
       <footer className="site-footer">
         <div className="shell footer-shell">
           <div>
-            <h3>CollabSpace</h3>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <img src={logoImg} alt="CollabSpace Logo" style={{ height: '32px', width: 'auto', transform: 'scale(2.5)', transformOrigin: 'left center', marginRight: '25px' }} />
+              <h3 style={{ margin: 0, zIndex: 1, position: 'relative' }}>CollabSpace</h3>
+            </div>
             <p>Systematizing student collaboration.</p>
           </div>
           <div className="footer-links">

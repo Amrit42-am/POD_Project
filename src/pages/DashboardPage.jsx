@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { request, escapeHtml, formatFullDate, formatDate, normalizeTaskStatus, isArchivedTask, normalizeTask, initialsFor } from '../utils/api';
 import ThemeToggle from '../components/ThemeToggle';
+import logoImg from '../images/Logo.png';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -602,22 +603,160 @@ function renderReminderCenter() {
     return;
   }
 
-  if (model.items.length === 0) {
-    content.innerHTML = `
-      <div class="deadline-reminder-empty">
-        <strong class="task-empty-title">Everything looks calm</strong>
-        <p class="task-empty-copy">There are no overdue tasks or near-term deadlines in this workspace.</p>
-      </div>
-    `;
-    return;
-  }
+  // Read current filter/sort from data attributes or default
+  const currentFilter = content.dataset.activeFilter || "all";
+  const currentSort = content.dataset.activeSort || "severity";
 
-  content.innerHTML = `
-    <div class="deadline-reminder-modal-grid">
-      ${model.items.map(buildReminderItemMarkup).join("")}
+  // Filter items
+  let filtered = model.items;
+  if (currentFilter === "overdue") filtered = model.items.filter(i => i.severity === "overdue");
+  else if (currentFilter === "urgent") filtered = model.items.filter(i => i.severity === "urgent");
+  else if (currentFilter === "upcoming") filtered = model.items.filter(i => i.severity === "upcoming");
+  else if (currentFilter === "mine") filtered = model.items.filter(i => i.isMine);
+
+  // Snooze: filter out snoozed items
+  const snoozedIds = JSON.parse(sessionStorage.getItem("collabspace_snoozed") || "[]");
+  filtered = filtered.filter(i => !snoozedIds.includes(i.id));
+
+  // Sort items
+  if (currentSort === "duedate") {
+    filtered.sort((a, b) => a.dueTime - b.dueTime);
+  }
+  // default "severity" sort is already applied by buildDeadlineReminderModel
+
+  const filterButtons = [
+    { key: "all", label: "All", count: model.items.filter(i => !snoozedIds.includes(i.id)).length },
+    { key: "overdue", label: "Overdue", count: model.overdueCount },
+    { key: "urgent", label: "Next 24h", count: model.urgentCount },
+    { key: "upcoming", label: "This Week", count: model.upcomingCount },
+    { key: "mine", label: "Mine Only", count: model.items.filter(i => i.isMine && !snoozedIds.includes(i.id)).length }
+  ];
+
+  const statsMarkup = `
+    <div class="rc-stats-row">
+      <div class="rc-stat is-overdue">
+        <strong>${model.overdueCount}</strong>
+        <span>Overdue</span>
+      </div>
+      <div class="rc-stat is-urgent">
+        <strong>${model.urgentCount}</strong>
+        <span>Due Today</span>
+      </div>
+      <div class="rc-stat">
+        <strong>${model.upcomingCount}</strong>
+        <span>This Week</span>
+      </div>
+      <div class="rc-stat rc-stat-total">
+        <strong>${model.items.length}</strong>
+        <span>Total</span>
+      </div>
     </div>
   `;
+
+  const filterMarkup = `
+    <div class="rc-toolbar">
+      <div class="rc-filter-bar">
+        ${filterButtons.map(f => `
+          <button class="rc-filter-btn ${currentFilter === f.key ? "is-active" : ""}" data-rc-filter="${f.key}">
+            ${escapeHtml(f.label)}
+            <span class="rc-filter-count">${f.count}</span>
+          </button>
+        `).join("")}
+      </div>
+      <div class="rc-sort-bar">
+        <button class="rc-sort-btn ${currentSort === "severity" ? "is-active" : ""}" data-rc-sort="severity">By Severity</button>
+        <button class="rc-sort-btn ${currentSort === "duedate" ? "is-active" : ""}" data-rc-sort="duedate">By Due Date</button>
+      </div>
+    </div>
+  `;
+
+  let listMarkup;
+  if (filtered.length === 0) {
+    const emptyMsg = currentFilter === "all"
+      ? "No active deadlines in this workspace. Add due dates to tasks to activate reminders."
+      : `No ${currentFilter === "mine" ? "deadlines assigned to you" : currentFilter + " items"} right now.`;
+    listMarkup = `
+      <div class="rc-empty">
+        <div class="rc-empty-icon">✓</div>
+        <strong>All clear</strong>
+        <p>${escapeHtml(emptyMsg)}</p>
+      </div>
+    `;
+  } else {
+    listMarkup = `
+      <div class="rc-list">
+        ${filtered.map(item => {
+          const assigneeLabel = item.assignees.length > 0 ? item.assignees.join(", ") : "Team-wide";
+          return `
+            <article class="rc-card is-${item.severity}">
+              <div class="rc-card-indicator is-${item.severity}"></div>
+              <div class="rc-card-body">
+                <div class="rc-card-head">
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <div class="rc-card-pills">
+                    ${item.isMine ? '<span class="rc-pill rc-pill-mine">Assigned to you</span>' : ''}
+                    <span class="rc-pill rc-pill-severity is-${item.severity}">${item.severity === "overdue" ? "Overdue" : item.severity === "urgent" ? "Urgent" : "Upcoming"}</span>
+                  </div>
+                </div>
+                <p class="rc-card-meta">${escapeHtml(item.subtitle)} · ${escapeHtml(assigneeLabel)}</p>
+              </div>
+              <div class="rc-card-right">
+                <span class="deadline-reminder-badge is-${item.severity}">${escapeHtml(item.dueLabel)}</span>
+                <button class="rc-snooze-btn" data-rc-snooze="${escapeHtml(item.id)}" title="Dismiss this reminder for this session">Dismiss</button>
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  const snoozedCount = snoozedIds.length;
+  const snoozedNote = snoozedCount > 0
+    ? `<div class="rc-snoozed-note"><span>${snoozedCount} dismissed</span><button class="rc-restore-btn" data-rc-restore>Restore all</button></div>`
+    : "";
+
+  content.innerHTML = statsMarkup + filterMarkup + listMarkup + snoozedNote;
+
+  // Wire filter clicks
+  content.querySelectorAll("[data-rc-filter]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      content.dataset.activeFilter = btn.dataset.rcFilter;
+      renderReminderCenter();
+    });
+  });
+
+  // Wire sort clicks
+  content.querySelectorAll("[data-rc-sort]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      content.dataset.activeSort = btn.dataset.rcSort;
+      renderReminderCenter();
+    });
+  });
+
+  // Wire snooze clicks
+  content.querySelectorAll("[data-rc-snooze]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.rcSnooze;
+      const current = JSON.parse(sessionStorage.getItem("collabspace_snoozed") || "[]");
+      if (!current.includes(id)) current.push(id);
+      sessionStorage.setItem("collabspace_snoozed", JSON.stringify(current));
+      renderReminderCenter();
+      showToast("Reminder dismissed for this session.", "success");
+    });
+  });
+
+  // Wire restore
+  const restoreBtn = content.querySelector("[data-rc-restore]");
+  if (restoreBtn) {
+    restoreBtn.addEventListener("click", () => {
+      sessionStorage.removeItem("collabspace_snoozed");
+      renderReminderCenter();
+      showToast("All dismissed reminders restored.", "success");
+    });
+  }
 }
+
 
 function getCompletionWindowLabel(task) {
   if (isArchivedTask(task)) {
@@ -1126,32 +1265,37 @@ function renderWeeklyReportPreview() {
   period.textContent = weeklyReportData.periodLabel;
   const summary = weeklyReportData.summary || {};
   const highlights = Array.isArray(weeklyReportData.highlights) ? weeklyReportData.highlights.slice(0, 2) : [];
+  const generatedIso = String(weeklyReportData.generatedAt || "").trim();
+  const generatedLabel = generatedIso ? formatFullDate(generatedIso) : "";
+  const rawTeamName = String(weeklyReportData.teamName || "").trim();
+  const teamNameSafe = escapeHtml(rawTeamName || "Workspace");
 
   preview.innerHTML = `
-    <div class="weekly-report-hero">
-      <strong>${escapeHtml(summary.headline || "No weekly activity yet.")}</strong>
-      <p class="task-lock-note">Generated from live tasks, chat activity, and peer review data for this workspace.</p>
-    </div>
-    <div class="weekly-report-metric-grid">
-      <article class="weekly-report-metric-card">
-        <span class="dashboard-command-label">Created</span>
-        <strong class="dashboard-command-value">${escapeHtml(String(summary.createdThisWeek || 0))}</strong>
-      </article>
-      <article class="weekly-report-metric-card">
-        <span class="dashboard-command-label">Completed</span>
-        <strong class="dashboard-command-value">${escapeHtml(String(summary.completedThisWeek || 0))}</strong>
-      </article>
-      <article class="weekly-report-metric-card">
-        <span class="dashboard-command-label">Overdue</span>
-        <strong class="dashboard-command-value">${escapeHtml(String(summary.overdueCount || 0))}</strong>
-      </article>
-      <article class="weekly-report-metric-card">
-        <span class="dashboard-command-label">Peer Avg</span>
-        <strong class="dashboard-command-value">${escapeHtml(formatRatingValue(summary.peerRatingAverage))}</strong>
-      </article>
-    </div>
-    <div class="weekly-report-highlight-list">
-      ${highlights.length === 0
+    <div class="weekly-report-preview-shell">
+      <div class="weekly-report-hero">
+        <strong>${escapeHtml(summary.headline || "No weekly activity yet.")}</strong>
+        <p class="task-lock-note weekly-report-hero-note">Generated from live tasks, chat activity, and peer review data for this workspace.</p>
+      </div>
+      <div class="weekly-report-metric-grid">
+        <article class="weekly-report-metric-card">
+          <span class="dashboard-command-label">Created</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.createdThisWeek || 0))}</strong>
+        </article>
+        <article class="weekly-report-metric-card">
+          <span class="dashboard-command-label">Completed</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.completedThisWeek || 0))}</strong>
+        </article>
+        <article class="weekly-report-metric-card">
+          <span class="dashboard-command-label">Overdue</span>
+          <strong class="dashboard-command-value">${escapeHtml(String(summary.overdueCount || 0))}</strong>
+        </article>
+        <article class="weekly-report-metric-card weekly-report-metric-card-peer">
+          <span class="dashboard-command-label">Peer Avg</span>
+          <strong class="dashboard-command-value weekly-report-peer-avg">${escapeHtml(formatRatingValue(summary.peerRatingAverage))}</strong>
+        </article>
+      </div>
+      <div class="weekly-report-highlight-list">
+        ${highlights.length === 0
         ? '<div class="deadline-reminder-empty"><strong class="task-empty-title">No recent wins yet</strong><p class="task-empty-copy">As tasks close out this week, they will appear here for a quick recap.</p></div>'
         : highlights.map((item) => `
           <article class="weekly-report-highlight-card">
@@ -1159,6 +1303,13 @@ function renderWeeklyReportPreview() {
             <span>${escapeHtml(item.completedAt || "Completed recently")}</span>
           </article>
         `).join("")}
+      </div>
+      <footer class="weekly-report-preview-footer">
+        <span class="weekly-report-preview-team" title="${teamNameSafe}">${teamNameSafe}</span>
+        ${generatedLabel
+    ? `<time class="weekly-report-preview-generated" datetime="${escapeHtml(generatedIso)}">${escapeHtml(generatedLabel)}</time>`
+    : `<span class="weekly-report-preview-generated">—</span>`}
+      </footer>
     </div>
   `;
 }
@@ -2302,8 +2453,8 @@ bootstrap();
     <aside className="app-sidebar">
       <div className="sidebar-header">
         <div className="sidebar-brand" data-navigate="/">
-          <div className="brand-mark">C</div>
-          CollabSpace
+          <img src={logoImg} alt="CollabSpace Logo" className="brand-logo" style={{ height: '32px', width: 'auto', transform: 'scale(2.5)', transformOrigin: 'left center', marginRight: '25px' }} />
+          <span style={{ zIndex: 1, position: 'relative' }}>CollabSpace</span>
         </div>
         <div className="project-context-card" id="project-context-card">
           <h3 className="project-context-title" id="context-team-name">Workspace</h3>
@@ -2479,18 +2630,18 @@ bootstrap();
             <div id="peer-rating-list" className="peer-rating-list"></div>
           </section>
 
-          <section className="dashboard-panel contribution-panel">
+          <section className="dashboard-panel contribution-panel weekly-report-panel">
             <div className="contribution-panel-head contribution-panel-head-split">
               <div>
                 <h2 className="board-title">Weekly Progress Report</h2>
                 <p className="contribution-panel-copy">A one-click summary of delivery, blockers, chat activity, and peer review participation.</p>
               </div>
-              <div className="feature-button-row">
+              <div className="feature-button-row weekly-report-actions">
                 <button type="button" id="refresh-weekly-report-btn" className="btn btn-ghost">Refresh</button>
                 <button type="button" id="open-weekly-report-btn" className="btn btn-primary">Open Report</button>
               </div>
             </div>
-            <p id="weekly-report-period-label" className="task-lock-note">Generating latest summary...</p>
+            <p id="weekly-report-period-label" className="task-lock-note weekly-report-period-kicker">Generating latest summary...</p>
             <div id="weekly-report-preview"></div>
           </section>
         </div>
@@ -2569,11 +2720,11 @@ bootstrap();
   </dialog>
 
   <dialog id="deadline-modal">
-    <div className="modal-shell feature-modal-shell">
+    <div className="modal-shell reminder-center-shell">
       <div className="modal-header">
         <div>
-          <h3 className="modal-title">Deadline Reminder Center</h3>
-          <p className="modal-subtitle">A focused list of overdue work, next-up due dates, and the active workspace milestone.</p>
+          <h3 className="modal-title">Reminder Center</h3>
+          <p className="modal-subtitle">Track every overdue task, urgent deadline, and upcoming checkpoint across this workspace. Filter, sort, and dismiss items you've already handled.</p>
         </div>
         <button type="button" id="close-deadline-modal" className="btn btn-ghost">Close</button>
       </div>

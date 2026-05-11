@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { request, escapeHtml, formatRelativeTime, initialsFor } from '../utils/api';
 import ThemeToggle from '../components/ThemeToggle';
+import logoImg from '../images/Logo.png';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -553,6 +554,143 @@ function generateCard(team, isLeader, tasks = []) {
   `;
 }
 
+function parseDeadlineValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    return new Date(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999);
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDeadlineDistance(deadlineValue) {
+  const dueDate = parseDeadlineValue(deadlineValue);
+  if (!dueDate) return "No due date";
+  const diffMs = dueDate.getTime() - Date.now();
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (diffMs < 0) {
+    return Math.abs(diffHours) < 24 ? `Overdue by ${Math.max(1, Math.abs(diffHours))}h` : `Overdue by ${Math.max(1, Math.abs(diffDays))}d`;
+  }
+  if (diffHours <= 24) return diffHours <= 1 ? "Due within 1h" : `Due in ${diffHours}h`;
+  if (diffDays <= 7) return `Due in ${diffDays}d`;
+  return `Due ${dueDate.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+}
+
+function renderMyDeadlines(projects, tasks) {
+  const container = document.getElementById("hub-deadlines-widget");
+  if (!container) return;
+
+  const now = Date.now();
+  const nextWeekMs = 7 * 24 * 60 * 60 * 1000;
+  const nextDayMs = 24 * 60 * 60 * 1000;
+
+  const reminders = [];
+  const activeTasks = tasks.filter(t => {
+    const status = String(t.status || "").trim().toLowerCase();
+    return status !== "done" && status !== "completed" && !t.archivedAt;
+  });
+
+  activeTasks.forEach(task => {
+    const dueDate = parseDeadlineValue(task.deadline);
+    if (!dueDate) return;
+    const diffMs = dueDate.getTime() - now;
+    if (diffMs > nextWeekMs) return;
+
+    const isAssigned = (Array.isArray(task.assignees) && task.assignees.some(a => a?.id === currentUser.id))
+      || task.assigneeId === currentUser.id
+      || task.assignee === currentUser.name;
+
+    const severity = diffMs < 0 ? "overdue" : diffMs <= nextDayMs ? "urgent" : "upcoming";
+    const project = projects.find(p => p.id === task.teamId);
+
+    reminders.push({
+      dueLabel: formatDeadlineDistance(task.deadline),
+      dueTime: dueDate.getTime(),
+      id: task.id,
+      isMine: isAssigned,
+      projectName: project?.projectTitle || project?.name || task.teamName || "Workspace",
+      severity,
+      severityRank: diffMs < 0 ? 0 : diffMs <= nextDayMs ? 1 : 2,
+      teamId: task.teamId,
+      title: String(task.title || "Untitled task").trim()
+    });
+  });
+
+  // Also check project-level deadlines
+  projects.forEach(project => {
+    const projDeadline = parseDeadlineValue(project.deadline);
+    if (!projDeadline) return;
+    const diffMs = projDeadline.getTime() - now;
+    if (diffMs > 14 * 24 * 60 * 60 * 1000) return;
+    reminders.push({
+      dueLabel: formatDeadlineDistance(project.deadline),
+      dueTime: projDeadline.getTime(),
+      id: `proj-${project.id}`,
+      isMine: true,
+      projectName: project.projectTitle || project.name || "Workspace",
+      severity: diffMs < 0 ? "overdue" : diffMs <= nextWeekMs ? "urgent" : "upcoming",
+      severityRank: diffMs < 0 ? 0 : diffMs <= nextWeekMs ? 1 : 2,
+      teamId: project.id,
+      title: `${project.projectTitle || project.name || "Workspace"} milestone`
+    });
+  });
+
+  reminders.sort((a, b) => a.severityRank - b.severityRank || a.dueTime - b.dueTime);
+
+  const overdueCount = reminders.filter(r => r.severity === "overdue").length;
+  const urgentCount = reminders.filter(r => r.severity === "urgent").length;
+  const upcomingCount = reminders.filter(r => r.severity === "upcoming").length;
+
+  if (reminders.length === 0) {
+    container.innerHTML = `
+      <div class="hub-deadlines-empty">
+        <div class="hub-deadlines-empty-icon">✓</div>
+        <strong>No upcoming deadlines</strong>
+        <p>Add due dates to tasks in your workspaces and they'll appear here automatically.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const statsHtml = `
+    <div class="hub-deadlines-stats">
+      <div class="hub-deadlines-stat ${overdueCount > 0 ? "is-overdue" : ""}">
+        <strong>${overdueCount}</strong><span>Overdue</span>
+      </div>
+      <div class="hub-deadlines-stat ${urgentCount > 0 ? "is-urgent" : ""}">
+        <strong>${urgentCount}</strong><span>Next 24h</span>
+      </div>
+      <div class="hub-deadlines-stat">
+        <strong>${upcomingCount}</strong><span>This Week</span>
+      </div>
+    </div>
+  `;
+
+  const listHtml = reminders.slice(0, 8).map(item => `
+    <article class="hub-deadline-card is-${item.severity}" data-team-id="${escapeHtml(item.teamId)}">
+      <div class="hub-deadline-indicator is-${item.severity}"></div>
+      <div class="hub-deadline-body">
+        <div class="hub-deadline-head">
+          <strong>${escapeHtml(item.title)}</strong>
+          ${item.isMine ? '<span class="hub-deadline-pill mine">You</span>' : ''}
+        </div>
+        <span class="hub-deadline-project">${escapeHtml(item.projectName)}</span>
+      </div>
+      <span class="deadline-reminder-badge is-${item.severity}">${escapeHtml(item.dueLabel)}</span>
+    </article>
+  `).join("");
+
+  const overflowNote = reminders.length > 8
+    ? `<p class="hub-deadlines-overflow">+${reminders.length - 8} more across your workspaces</p>`
+    : "";
+
+  container.innerHTML = statsHtml + `<div class="hub-deadlines-list">${listHtml}</div>` + overflowNote;
+}
+
 async function loadAllTasksForProjects(projects) {
   const settledResults = await Promise.allSettled(
     projects.map(async (project) => {
@@ -688,6 +826,7 @@ async function loadProjects() {
       memberGrid.innerHTML = memberTeams.map((team) => generateCard(team, false, allTasks)).join("");
     }
     hubState.tasks = allTasks;
+    renderMyDeadlines(allProjects, allTasks);
     renderProfileStats(allProjects, allTasks);
     renderProjectInvolvement(allProjects);
     renderProjectContributions(allProjects, allTasks);
@@ -810,8 +949,8 @@ async function logout() {
     <aside className="app-sidebar">
       <div className="sidebar-header">
         <div className="sidebar-brand" data-navigate="/">
-          <div className="brand-mark">C</div>
-          CollabSpace
+          <img src={logoImg} alt="CollabSpace Logo" className="brand-logo" style={{ height: '32px', width: 'auto', transform: 'scale(2.5)', transformOrigin: 'left center', marginRight: '25px' }} />
+          <span style={{ zIndex: 1, position: 'relative' }}>CollabSpace</span>
         </div>
       </div>
       
@@ -962,6 +1101,22 @@ async function logout() {
             </article>
           </div>
         </div>
+
+        <section className="hub-section-shell hub-deadlines-section">
+          <div className="hub-section-head">
+            <div>
+              <h3 className="project-group-title">My Deadlines</h3>
+              <p className="hub-section-copy">Upcoming and overdue deadlines across all your workspaces in one view.</p>
+            </div>
+          </div>
+          <div id="hub-deadlines-widget" className="hub-deadlines-widget">
+            <div className="hub-deadlines-empty">
+              <div className="hub-deadlines-empty-icon">⏳</div>
+              <strong>Loading deadlines...</strong>
+              <p>Scanning your workspaces for upcoming due dates.</p>
+            </div>
+          </div>
+        </section>
 
         <section className="hub-section-shell">
           <div className="hub-section-head">

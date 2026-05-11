@@ -3859,7 +3859,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   line-height: 1.55;
 }
 
-.dashboard-body .deadline-reminder-badge {
+.deadline-reminder-badge {
   flex-shrink: 0;
   align-self: center;
   min-height: 2rem;
@@ -3872,17 +3872,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   font-weight: 800;
 }
 
-.dashboard-body .deadline-reminder-badge.is-overdue {
-  color: #b91c1c;
-  background: rgba(254, 242, 242, 0.95);
-  border-color: rgba(248, 113, 113, 0.22);
-}
-
-.dashboard-body .deadline-reminder-badge.is-urgent {
-  color: #b45309;
-  background: rgba(255, 247, 237, 0.95);
-  border-color: rgba(251, 191, 36, 0.24);
-}
+/* Badge colors are unified now */
 
 .dashboard-body .deadline-reminder-empty,
 .dashboard-body .peer-rating-hero,
@@ -3946,6 +3936,110 @@ ul { list-style: none; padding: 0; margin: 0; }
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
 }
 
+/* Weekly Progress Report — inline preview layout & hierarchy */
+.dashboard-body .weekly-report-preview-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.15rem;
+}
+
+.dashboard-body .weekly-report-period-kicker {
+  margin: 0.25rem 0 0.15rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-body .weekly-report-preview-shell > .weekly-report-hero {
+  padding: 1.15rem 1.2rem;
+  border-radius: var(--r-lg, 16px);
+}
+
+/* Dark: preview hero must stay on a dark surface (light gradient was washing out headline copy). */
+html[data-theme="dark"] .dashboard-body .weekly-report-preview-shell > .weekly-report-hero {
+  border-color: rgba(129, 140, 248, 0.28);
+  background: linear-gradient(
+    125deg,
+    rgba(99, 102, 241, 0.16),
+    rgba(17, 24, 39, 0.88) 52%,
+    rgba(10, 12, 26, 0.94)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 32px rgba(0, 0, 0, 0.38);
+}
+
+html[data-theme="dark"] .dashboard-body .weekly-report-preview-shell .weekly-report-hero-note {
+  color: #94a3b8;
+}
+
+.dashboard-body .weekly-report-hero-note {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.dashboard-body .weekly-report-preview-shell .weekly-report-metric-grid {
+  gap: 0.85rem;
+}
+
+
+.dashboard-body .weekly-report-preview-shell .weekly-report-highlight-list {
+  margin-top: 0;
+}
+
+@media (min-width: 540px) {
+  .dashboard-body .weekly-report-preview-shell .weekly-report-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-body .weekly-report-preview-shell .weekly-report-metric-card-peer {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+  }
+
+  .dashboard-body .weekly-report-preview-shell .weekly-report-metric-card-peer .dashboard-command-label {
+    margin-top: 0;
+  }
+
+  .dashboard-body .weekly-report-preview-shell .weekly-report-metric-card-peer .weekly-report-peer-avg {
+    text-align: right;
+  }
+}
+
+.dashboard-body .weekly-report-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.78rem;
+}
+
+.dashboard-body .weekly-report-preview-team {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-body .weekly-report-preview-generated {
+  flex-shrink: 0;
+}
+
+.dashboard-body .weekly-report-panel .weekly-report-actions .btn-primary {
+  box-shadow:
+    0 6px 16px rgba(124, 58, 237, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
 .dashboard-body .weekly-report-section + .weekly-report-section {
   margin-top: 1.3rem;
 }
@@ -3973,6 +4067,547 @@ ul { list-style: none; padding: 0; margin: 0; }
 
 .report-modal-shell {
   max-width: min(920px, calc(100vw - 2rem));
+}
+
+/* ── Reminder Center Modal ───────────────────────────── */
+
+.reminder-center-shell {
+  max-width: min(860px, calc(100vw - 2rem));
+}
+
+.rc-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.rc-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.9rem 0.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 16px rgba(15, 23, 42, 0.04);
+}
+
+.rc-stat strong {
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.rc-stat span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7b8aa3;
+}
+
+.rc-stat.is-overdue { border-color: rgba(239, 68, 68, 0.2); }
+.rc-stat.is-overdue strong { color: #dc2626; }
+.rc-stat.is-urgent { border-color: rgba(245, 158, 11, 0.22); }
+.rc-stat.is-urgent strong { color: #d97706; }
+.rc-stat.rc-stat-total { border-color: rgba(99, 102, 241, 0.18); }
+.rc-stat.rc-stat-total strong { color: #6366f1; }
+
+.rc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.15rem;
+}
+
+.rc-filter-bar {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.rc-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.2rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.9);
+  color: #526178;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.rc-filter-btn:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(238, 242, 255, 0.8);
+  color: #4338ca;
+}
+
+.rc-filter-btn.is-active {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.1));
+  color: #4338ca;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
+}
+
+.rc-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.rc-filter-btn.is-active .rc-filter-count {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.rc-sort-bar {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.rc-sort-btn {
+  min-height: 2rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: transparent;
+  color: #7b8aa3;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.rc-sort-btn:hover { color: #334155; }
+
+.rc-sort-btn.is-active {
+  border-color: rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.06);
+  color: #4338ca;
+}
+
+.rc-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rc-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.93));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 22px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 16px 30px rgba(15, 23, 42, 0.08);
+}
+
+.rc-card.is-overdue { border-color: rgba(239, 68, 68, 0.22); }
+.rc-card.is-urgent { border-color: rgba(245, 158, 11, 0.24); }
+
+.rc-card-indicator {
+  width: 4px;
+  flex-shrink: 0;
+  background: #cbd5e1;
+}
+.rc-card-indicator.is-overdue { background: linear-gradient(180deg, #ef4444, #dc2626); }
+.rc-card-indicator.is-urgent { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.rc-card-indicator.is-upcoming { background: linear-gradient(180deg, #6366f1, #4f46e5); }
+
+.rc-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.rc-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.rc-card-head strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #111b2d;
+}
+
+.rc-card-pills {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.rc-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rc-pill-mine {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.14);
+}
+
+.rc-pill-severity.is-overdue { color: #b91c1c; background: rgba(254, 242, 242, 0.9); border: 1px solid rgba(248, 113, 113, 0.2); }
+.rc-pill-severity.is-urgent { color: #b45309; background: rgba(255, 247, 237, 0.9); border: 1px solid rgba(251, 191, 36, 0.22); }
+.rc-pill-severity.is-upcoming { color: #4338ca; background: rgba(238, 242, 255, 0.9); border: 1px solid rgba(99, 102, 241, 0.18); }
+
+.rc-card-meta {
+  margin: 0;
+  color: #62738b;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.rc-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  flex-shrink: 0;
+}
+
+.rc-snooze-btn {
+  min-height: 1.6rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.rc-snooze-btn:hover {
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  background: rgba(254, 242, 242, 0.6);
+}
+
+.rc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1.5rem;
+  border-radius: 1.25rem;
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  background: rgba(248, 250, 252, 0.7);
+  text-align: center;
+}
+
+.rc-empty-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1));
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  font-size: 1.2rem;
+  color: #16a34a;
+}
+
+.rc-empty strong {
+  color: #334155;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.rc-empty p {
+  margin: 0;
+  color: #7b8aa3;
+  font-size: 0.84rem;
+  max-width: 380px;
+}
+
+.rc-snoozed-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.85rem;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.rc-snoozed-note span {
+  color: #7b8aa3;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rc-restore-btn {
+  min-height: 1.6rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.06);
+  color: #6366f1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.rc-restore-btn:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+/* ── Hub My Deadlines Widget ────────────────────────── */
+
+.hub-deadlines-section {
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 1.5rem;
+  padding: 1.75rem;
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.6), rgba(255, 255, 255, 0.95), rgba(254, 243, 199, 0.15));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 16px 32px rgba(15, 23, 42, 0.08),
+    0 4px 8px rgba(99, 102, 241, 0.06);
+}
+
+.hub-deadlines-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.hub-deadlines-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1rem 0.75rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 10px 20px rgba(15, 23, 42, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hub-deadlines-stat:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 14px 28px rgba(15, 23, 42, 0.1);
+}
+
+.hub-deadlines-stat strong {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  color: #334155;
+  line-height: 1;
+}
+
+.hub-deadlines-stat span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+}
+
+/* Removed custom background/border for overdue/urgent stat cards to keep them uniform */
+
+.hub-deadlines-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.hub-deadline-card {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 10px 22px rgba(15, 23, 42, 0.06),
+    0 3px 6px rgba(15, 23, 42, 0.03);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hub-deadline-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 18px 32px rgba(15, 23, 42, 0.1),
+    0 6px 12px rgba(15, 23, 42, 0.05);
+}
+
+.hub-deadline-card.is-overdue {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(254, 242, 242, 0.5));
+}
+
+.hub-deadline-indicator {
+  width: 5px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #94a3b8, #cbd5e1);
+}
+
+.hub-deadline-indicator.is-overdue { background: linear-gradient(180deg, #ef4444, #dc2626); }
+.hub-deadline-indicator.is-urgent { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.hub-deadline-indicator.is-upcoming { background: linear-gradient(180deg, #6366f1, #4f46e5); }
+
+.hub-deadline-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.hub-deadline-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.hub-deadline-head strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-deadline-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.hub-deadline-pill.mine {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.hub-deadline-project {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.hub-deadline-card .deadline-reminder-badge {
+  align-self: center;
+  margin-right: 1rem;
+  flex-shrink: 0;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.hub-deadlines-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 2.5rem 1.5rem;
+  border-radius: 1.25rem;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
+.hub-deadlines-empty-icon {
+  font-size: 1.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.hub-deadlines-empty strong {
+  color: #1e293b;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.hub-deadlines-empty p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  max-width: 340px;
+  line-height: 1.6;
+}
+
+.hub-deadlines-overflow {
+  margin: 0.85rem 0 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .rc-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .rc-toolbar { flex-direction: column; align-items: stretch; }
+  .rc-card { flex-direction: column; }
+  .rc-card-right { flex-direction: row; padding: 0 1rem 0.75rem; justify-content: space-between; }
+  .hub-deadlines-stats { grid-template-columns: repeat(3, 1fr); }
 }
 
 .dashboard-body .contribution-layout {
@@ -5420,12 +6055,21 @@ ul { list-style: none; padding: 0; margin: 0; }
 :is(.app-shell-theme, .dashboard-body) .weekly-report-hero,
 :is(.app-shell-theme, .dashboard-body) .deadline-reminder-empty,
 :is(.app-shell-theme, .dashboard-body) .peer-rating-hero,
-:is(.app-shell-theme, .dashboard-body) .weekly-report-loading {
+:is(.app-shell-theme, .dashboard-body) .weekly-report-loading,
+:is(.app-shell-theme, .dashboard-body) .weekly-report-preview-footer {
   border-color: rgba(173, 194, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 16px 28px rgba(0, 0, 0, 0.18);
+}
+
+:is(.app-shell-theme, .dashboard-body) .weekly-report-preview-team {
+  color: #e8efff;
+}
+
+:is(.app-shell-theme, .dashboard-body) .weekly-report-preview-generated {
+  color: #8ea1c7;
 }
 
 :is(.app-shell-theme, .dashboard-body) .deadline-reminder-head strong,
@@ -5449,20 +6093,147 @@ ul { list-style: none; padding: 0; margin: 0; }
   color: #8ea1c7;
 }
 
-:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge {
+html[data-theme="dark"] .deadline-reminder-badge {
   border-color: rgba(173, 194, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: #d7e4ff;
 }
+/* Removed custom backgrounds for overdue/urgent badges to keep them uniform */
 
-:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge.is-overdue {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.36);
+/* ── Dark mode: Reminder Center ─── */
+
+:is(.app-shell-theme, .dashboard-body) .rc-stat,
+:is(.app-shell-theme, .dashboard-body) .rc-card,
+:is(.app-shell-theme, .dashboard-body) .rc-empty,
+:is(.app-shell-theme, .dashboard-body) .rc-snoozed-note {
+  border-color: rgba(173, 194, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 24px rgba(0, 0, 0, 0.16);
 }
 
-:is(.app-shell-theme, .dashboard-body) .deadline-reminder-badge.is-urgent {
-  color: #fde68a;
-  background: rgba(120, 53, 15, 0.36);
+:is(.app-shell-theme, .dashboard-body) .rc-stat strong,
+:is(.app-shell-theme, .dashboard-body) .rc-card-head strong,
+:is(.app-shell-theme, .dashboard-body) .rc-empty strong {
+  color: #f1f5f9;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-stat span,
+:is(.app-shell-theme, .dashboard-body) .rc-card-meta,
+:is(.app-shell-theme, .dashboard-body) .rc-empty p,
+:is(.app-shell-theme, .dashboard-body) .rc-snoozed-note span {
+  color: #8ea1c7;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-stat.is-overdue strong { color: #fca5a5; }
+:is(.app-shell-theme, .dashboard-body) .rc-stat.is-urgent strong { color: #fcd34d; }
+:is(.app-shell-theme, .dashboard-body) .rc-stat.rc-stat-total strong { color: #a5b4fc; }
+
+:is(.app-shell-theme, .dashboard-body) .rc-filter-btn {
+  border-color: rgba(173, 194, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8ea1c7;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-filter-btn:hover,
+:is(.app-shell-theme, .dashboard-body) .rc-filter-btn.is-active {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-filter-count {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-sort-btn {
+  border-color: rgba(173, 194, 255, 0.1);
+  color: #7b8faa;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-sort-btn.is-active {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-snooze-btn {
+  border-color: rgba(173, 194, 255, 0.1);
+  color: #7b8faa;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-snooze-btn:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.2);
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-pill-mine {
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-pill-severity.is-overdue { color: #fecaca; background: rgba(127, 29, 29, 0.3); border-color: rgba(239, 68, 68, 0.2); }
+:is(.app-shell-theme, .dashboard-body) .rc-pill-severity.is-urgent { color: #fde68a; background: rgba(120, 53, 15, 0.3); border-color: rgba(245, 158, 11, 0.2); }
+:is(.app-shell-theme, .dashboard-body) .rc-pill-severity.is-upcoming { color: #c7d2fe; background: rgba(67, 56, 202, 0.2); border-color: rgba(99, 102, 241, 0.2); }
+
+:is(.app-shell-theme, .dashboard-body) .rc-restore-btn {
+  border-color: rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.08);
+  color: #a5b4fc;
+}
+
+:is(.app-shell-theme, .dashboard-body) .rc-empty-icon {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}/* ── Dark mode: Hub Deadlines Widget ─── */
+
+html[data-theme="dark"] .hub-deadlines-section {
+  border-color: rgba(173, 194, 255, 0.1);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.7));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 28px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dark"] .hub-deadlines-stat,
+html[data-theme="dark"] .hub-deadline-card,
+html[data-theme="dark"] .hub-deadlines-empty {
+  border-color: rgba(173, 194, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="dark"] .hub-deadlines-stat:hover,
+html[data-theme="dark"] .hub-deadline-card:hover {
+  border-color: rgba(173, 194, 255, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+}
+
+html[data-theme="dark"] .hub-deadlines-stat strong,
+html[data-theme="dark"] .hub-deadline-head strong,
+html[data-theme="dark"] .hub-deadlines-empty strong {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .hub-deadlines-stat span,
+html[data-theme="dark"] .hub-deadline-project,
+html[data-theme="dark"] .hub-deadlines-empty p,
+html[data-theme="dark"] .hub-deadlines-overflow {
+  color: #94a3b8;
+}
+
+/* Removed dark mode color overrides for stat cards to ensure uniformity */
+
+html[data-theme="dark"] .hub-deadline-card.is-overdue {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02));
+}
+
+html[data-theme="dark"] .hub-deadline-pill.mine {
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.16);
+  border-color: rgba(37, 99, 235, 0.24);
 }
 
 :is(.app-shell-theme, .dashboard-body) .dashboard-command-feature {
@@ -6403,6 +7174,121 @@ html[data-theme="dark"] {
   color: var(--text-secondary) !important;
 }
 
+/* Light mode: nested dashboard insight cards (deadline / peer / weekly) and archive
+   meta values — override late :is(.app-shell-theme, .dashboard-body) dark rules only. */
+[data-theme="light"] .dashboard-body .archive-meta-item strong {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .dashboard-body .deadline-stat-card,
+[data-theme="light"] .dashboard-body .peer-rating-stat,
+[data-theme="light"] .dashboard-body .weekly-report-summary-card,
+[data-theme="light"] .dashboard-body .weekly-report-metric-card,
+[data-theme="light"] .dashboard-body .deadline-reminder-card,
+[data-theme="light"] .dashboard-body .peer-rating-row,
+[data-theme="light"] .dashboard-body .weekly-report-highlight-card,
+[data-theme="light"] .dashboard-body .weekly-report-list-card,
+[data-theme="light"] .dashboard-body .weekly-report-member-card,
+[data-theme="light"] .dashboard-body .peer-rating-form-card,
+[data-theme="light"] .dashboard-body .weekly-report-hero,
+[data-theme="light"] .dashboard-body .deadline-reminder-empty,
+[data-theme="light"] .dashboard-body .peer-rating-hero,
+[data-theme="light"] .dashboard-body .weekly-report-loading,
+[data-theme="light"] .dashboard-body .weekly-report-preview-footer {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-preview-shell > .weekly-report-hero {
+  border-color: rgba(99, 102, 241, 0.18);
+  background: linear-gradient(
+    125deg,
+    rgba(99, 102, 241, 0.07),
+    rgba(255, 255, 255, 0.98) 48%,
+    rgba(248, 250, 252, 0.98)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 22px rgba(15, 23, 42, 0.07);
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-preview-shell .weekly-report-metric-card {
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 4px 16px rgba(15, 23, 42, 0.075),
+    0 0 0 1px rgba(15, 23, 42, 0.035);
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-preview-footer {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-preview-team {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-preview-generated {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .dashboard-body .weekly-report-panel .weekly-report-actions .btn-primary {
+  box-shadow:
+    0 4px 12px rgba(124, 58, 237, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="light"] .dashboard-body .deadline-stat-card.is-overdue,
+[data-theme="light"] .dashboard-body .deadline-reminder-card.is-overdue {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="light"] .dashboard-body .deadline-stat-card.is-urgent,
+[data-theme="light"] .dashboard-body .deadline-reminder-card.is-urgent {
+  border-color: rgba(245, 158, 11, 0.38);
+}
+
+[data-theme="light"] .dashboard-body .deadline-reminder-head strong,
+[data-theme="light"] .dashboard-body .peer-rating-row-copy strong,
+[data-theme="light"] .dashboard-body .weekly-report-highlight-card strong,
+[data-theme="light"] .dashboard-body .weekly-report-list-card strong,
+[data-theme="light"] .dashboard-body .weekly-report-member-head strong,
+[data-theme="light"] .dashboard-body .peer-rating-form-head strong,
+[data-theme="light"] .dashboard-body .weekly-report-hero strong,
+[data-theme="light"] .dashboard-body .peer-rating-score {
+  color: #111b2d !important;
+}
+
+[data-theme="light"] .dashboard-body .deadline-reminder-meta,
+[data-theme="light"] .dashboard-body .peer-rating-row-copy span,
+[data-theme="light"] .dashboard-body .peer-rating-note,
+[data-theme="light"] .dashboard-body .weekly-report-highlight-card span,
+[data-theme="light"] .dashboard-body .weekly-report-list-card span,
+[data-theme="light"] .dashboard-body .weekly-report-member-head span,
+[data-theme="light"] .dashboard-body .weekly-report-member-stats span {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .dashboard-body .deadline-reminder-badge {
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.98);
+  color: #334155 !important;
+}
+
+[data-theme="light"] .dashboard-body .deadline-stat-card .dashboard-command-label,
+[data-theme="light"] .dashboard-body .peer-rating-stat .dashboard-command-label,
+[data-theme="light"] .dashboard-body .weekly-report-metric-card .dashboard-command-label {
+  opacity: 1;
+  color: var(--text-muted) !important;
+}
+
 [data-theme="light"] .field input,
 [data-theme="light"] .field textarea,
 [data-theme="light"] .field select,
@@ -6537,6 +7423,14 @@ html[data-theme="dark"] {
   text-transform: uppercase;
   opacity: 0.55;
   margin-top: 0.3rem;
+}
+
+.dashboard-body .weekly-report-peer-avg.dashboard-command-value {
+  font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  line-height: 1.38;
+  font-family: var(--font-display);
 }
 
 /* Section headings — tight and punchy */
