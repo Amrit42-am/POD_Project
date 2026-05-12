@@ -196,6 +196,51 @@ export default function SettingsPage() {
       renderPreviewTags("settings-preview-focus", tagState.workFocus, "Add your usual work lanes to guide assignments");
     }
 
+    function renderEmailVerificationState() {
+      const badge = document.getElementById("email-verify-badge");
+      const hint = document.getElementById("email-verify-hint");
+      if (!badge || !hint) return;
+      const isVerified = Boolean(currentUser?.emailVerified);
+      badge.textContent = isVerified ? "Verified" : "Not Verified";
+      badge.classList.toggle("status-pill", true);
+      badge.classList.toggle("subtle", !isVerified);
+      hint.textContent = isVerified
+        ? "Your email is verified."
+        : "Verify your email to improve account security and recovery.";
+    }
+
+    async function sendEmailVerificationCode() {
+      const payload = await request("/api/auth/verify-email/request", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      if (payload.devCode) {
+        showToast(`Dev verification code: ${payload.devCode}`, "info");
+      }
+      showToast(payload.message || "Verification code sent.", "success");
+    }
+
+    async function confirmEmailVerification(code) {
+      const payload = await request("/api/auth/verify-email/confirm", {
+        method: "POST",
+        body: JSON.stringify({ code })
+      });
+      if (payload.user) {
+        currentUser = payload.user;
+        setCurrentUser(payload.user);
+      }
+      renderEmailVerificationState();
+      showToast(payload.message || "Email verified.", "success");
+    }
+
+    async function changePasswordWithCurrent(currentPassword, newPassword) {
+      const payload = await request("/api/auth/password/change", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      showToast(payload.message || "Password updated.", "success");
+    }
+
     function wireTagInput(key) {
       const config = tagConfig[key];
       const input = document.getElementById(config.inputId);
@@ -238,6 +283,7 @@ export default function SettingsPage() {
         setTagValues("skills", Array.isArray(currentUser.skills) ? currentUser.skills : []);
         setTagValues("workFocus", Array.isArray(currentUser.workFocus) ? currentUser.workFocus : []);
         renderSettingsPreview();
+        renderEmailVerificationState();
       } catch (err) {
         navigate("/?auth=login");
       }
@@ -303,8 +349,77 @@ export default function SettingsPage() {
       document.getElementById(fieldId)?.addEventListener("input", renderSettingsPreview);
     });
 
+    const sendVerifyBtn = document.getElementById("send-verify-code-btn");
+    const verifyEmailForm = document.getElementById("verify-email-form");
+    const changePasswordForm = document.getElementById("change-password-form");
+    const toOtpResetBtn = document.getElementById("go-otp-reset-btn");
+
+    const handleSendVerify = async () => {
+      const originalText = sendVerifyBtn?.textContent || "Send Code";
+      if (sendVerifyBtn) {
+        sendVerifyBtn.disabled = true;
+        sendVerifyBtn.textContent = "Sending...";
+      }
+      try {
+        await sendEmailVerificationCode();
+      } catch (error) {
+        showToast(error.message, "error");
+      } finally {
+        if (sendVerifyBtn) {
+          sendVerifyBtn.disabled = false;
+          sendVerifyBtn.textContent = originalText;
+        }
+      }
+    };
+
+    const handleVerifyForm = async (event) => {
+      event.preventDefault();
+      const codeInput = document.getElementById("verify-email-code");
+      const code = String(codeInput?.value || "").replace(/\D/g, "").slice(0, 6);
+      if (!/^\d{6}$/.test(code)) {
+        showToast("Enter a valid 6-digit verification code.", "error");
+        return;
+      }
+      try {
+        await confirmEmailVerification(code);
+        if (codeInput) codeInput.value = "";
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    };
+
+    const handleChangePassword = async (event) => {
+      event.preventDefault();
+      const currentPassword = String(document.getElementById("current-password")?.value || "");
+      const newPassword = String(document.getElementById("new-password")?.value || "");
+      if (!currentPassword || !newPassword) {
+        showToast("Please enter current and new password.", "error");
+        return;
+      }
+      try {
+        await changePasswordWithCurrent(currentPassword, newPassword);
+        const formElement = event.currentTarget;
+        if (formElement instanceof HTMLFormElement) {
+          formElement.reset();
+        }
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    };
+
+    const handleOtpResetRedirect = () => navigate("/?auth=login");
+
+    sendVerifyBtn?.addEventListener("click", handleSendVerify);
+    verifyEmailForm?.addEventListener("submit", handleVerifyForm);
+    changePasswordForm?.addEventListener("submit", handleChangePassword);
+    toOtpResetBtn?.addEventListener("click", handleOtpResetRedirect);
+
     return () => {
       document.removeEventListener('click', handleGlobalClick);
+      sendVerifyBtn?.removeEventListener("click", handleSendVerify);
+      verifyEmailForm?.removeEventListener("submit", handleVerifyForm);
+      changePasswordForm?.removeEventListener("submit", handleChangePassword);
+      toOtpResetBtn?.removeEventListener("click", handleOtpResetRedirect);
     };
   }, [authCurrentUser, navigate, logout, setCurrentUser]);
 
@@ -382,6 +497,31 @@ export default function SettingsPage() {
                 <button type="submit" className="btn btn-primary">Save Changes</button>
               </div>
             </form>
+
+            <div className="settings-security-block">
+              <h3 className="profile-section-title">Account Security</h3>
+              <div className="settings-security-row">
+                <span>Email Verification</span>
+                <span id="email-verify-badge" className="status-pill subtle">Not Verified</span>
+              </div>
+              <p id="email-verify-hint" className="settings-helper">Verify your email to improve account security and recovery.</p>
+              <div className="feature-button-row">
+                <button type="button" id="send-verify-code-btn" className="btn btn-secondary">Send Verification Code</button>
+              </div>
+              <form id="verify-email-form" className="inline-form" style={{ marginTop: "0.75rem" }}>
+                <input className="settings-input" type="text" id="verify-email-code" placeholder="Enter 6-digit code" maxLength={6} />
+                <button type="submit" className="btn btn-secondary">Verify Email</button>
+              </form>
+
+              <form id="change-password-form" className="settings-password-grid" style={{ marginTop: "1rem" }}>
+                <input className="settings-input" type="password" id="current-password" placeholder="Current password" />
+                <input className="settings-input" type="password" id="new-password" placeholder="New password (8+ chars)" />
+                <button type="submit" className="btn btn-primary">Change Password</button>
+              </form>
+              <button type="button" id="go-otp-reset-btn" className="btn btn-ghost" style={{ marginTop: "0.6rem" }}>
+                Forgot password? Reset via email OTP
+              </button>
+            </div>
           </section>
 
           <aside className="settings-aside">

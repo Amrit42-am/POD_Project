@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { request as apiRequest } from '../utils/api';
 import CollabNodesBackground from '../components/CollabNodesBackground';
 import ThemeToggle from '../components/ThemeToggle';
 import logoImg from '../images/Logo.png';
@@ -156,11 +157,22 @@ export default function LandingPage() {
     const authOnlyElements = document.querySelectorAll(".auth-only");
     const authTabs = document.querySelectorAll("[data-auth-tab]");
     const authPanels = {
+      forgot: document.getElementById("forgot-panel"),
       login: document.getElementById("login-panel"),
-      register: document.getElementById("register-panel")
+      register: document.getElementById("register-panel"),
+      verify: document.getElementById("verify-panel")
     };
+    const forgotForm = document.getElementById("forgot-form");
+    const verifyForm = document.getElementById("verify-form");
+    const resendVerifyButton = document.getElementById("resend-verify-code");
+    const forgotCodeRequestButton = document.getElementById("forgot-request-code");
+    const forgotResetButton = document.getElementById("forgot-reset-password");
+    const forgotEmailInput = document.getElementById("forgot-email");
+    const forgotCodeInput = document.getElementById("forgot-code");
 
     let currentAuthMode = "register";
+    let pendingVerificationEmail = "";
+    let pendingForgotEmail = "";
 
     function showToast(message, type = "info") {
       const toast = document.createElement("div");
@@ -247,9 +259,36 @@ export default function LandingPage() {
       return true;
     }
 
+    function normalizeOtp(value) {
+      return String(value || "").replace(/\D/g, "").slice(0, 6);
+    }
+
+    async function requestVerificationCode(email) {
+      const payload = await apiRequest("/api/auth/verify-email/request", {
+        body: JSON.stringify(email ? { email } : {}),
+        method: "POST"
+      });
+      if (payload.devCode) {
+        showToast(`Dev verification code: ${payload.devCode}`, "info");
+      }
+      return payload;
+    }
+
+    async function requestPasswordResetCode(email) {
+      const payload = await apiRequest("/api/auth/password/forgot/request", {
+        body: JSON.stringify({ email }),
+        method: "POST"
+      });
+      if (payload.devCode) {
+        showToast(`Dev reset code: ${payload.devCode}`, "info");
+      }
+      return payload;
+    }
+
     function setAuthMode(mode) {
       currentAuthMode = mode;
       const isRegister = mode === "register";
+      const isLogin = mode === "login";
 
       for (const tab of authTabs) {
         const isActive = tab.dataset.authTab === mode;
@@ -257,12 +296,20 @@ export default function LandingPage() {
         tab.setAttribute("aria-selected", String(isActive));
       }
 
-      if (authPanels.register && authPanels.login) {
-        authPanels.register.hidden = !isRegister;
-        authPanels.login.hidden = isRegister;
-        authPanels.register.classList.toggle("is-active", isRegister);
-        authPanels.login.classList.toggle("is-active", !isRegister);
-      }
+      Object.entries(authPanels).forEach(([key, panel]) => {
+        if (!panel) return;
+        const isActive = key === mode;
+        panel.hidden = !isActive;
+        panel.classList.toggle("is-active", isActive);
+      });
+
+      authTabs.forEach((tab) => {
+        if (isRegister || isLogin) {
+          tab.removeAttribute("hidden");
+        } else {
+          tab.setAttribute("hidden", "true");
+        }
+      });
       clearFieldValidation(registerForm);
       clearFieldValidation(loginForm);
       setFeedback("");
@@ -306,14 +353,17 @@ export default function LandingPage() {
       setButtonBusy(submitButton, true, "Creating account...");
 
       try {
+        const registerEmail = String(form.get("email") || "").trim();
         await register({
           name: form.get("name"),
-          email: form.get("email"),
+          email: registerEmail,
           course: form.get("course"),
           password: form.get("password")
         });
-        showToast("Account created! Redirecting to dashboard...", "success");
-        setTimeout(() => navigate('/home?view=profile'), 800);
+        pendingVerificationEmail = registerEmail;
+        await requestVerificationCode(registerEmail);
+        showToast("Account created. Verify your email to secure your account.", "success");
+        setAuthMode("verify");
       } catch (error) {
         setFeedback(error.message);
       } finally {
@@ -341,6 +391,97 @@ export default function LandingPage() {
       }
     }
 
+    async function handleVerifySubmit(event) {
+      event.preventDefault();
+      const submitButton = verifyForm?.querySelector('button[type="submit"]');
+      const codeInput = document.getElementById("verify-code");
+      const code = normalizeOtp(codeInput?.value);
+      if (!/^\d{6}$/.test(code)) {
+        setFeedback("Enter the 6-digit verification code.");
+        return;
+      }
+      setButtonBusy(submitButton, true, "Verifying...");
+      try {
+        const payload = await apiRequest("/api/auth/verify-email/confirm", {
+          body: JSON.stringify({ code }),
+          method: "POST"
+        });
+        showToast(payload.message || "Email verified.", "success");
+        setFeedback("");
+        setTimeout(() => navigate('/home?view=profile'), 700);
+      } catch (error) {
+        setFeedback(error.message);
+      } finally {
+        setButtonBusy(submitButton, false, "");
+      }
+    }
+
+    async function handleForgotRequestCode(event) {
+      event.preventDefault();
+      const email = String(forgotEmailInput?.value || "").trim();
+      if (!isValidEmail(email)) {
+        setFeedback("Enter a valid email to receive a reset code.");
+        forgotEmailInput?.focus();
+        return;
+      }
+      setButtonBusy(forgotCodeRequestButton, true, "Sending...");
+      try {
+        await requestPasswordResetCode(email);
+        pendingForgotEmail = email;
+        showToast("Reset code sent. Check your email.", "success");
+        setFeedback("");
+      } catch (error) {
+        setFeedback(error.message);
+      } finally {
+        setButtonBusy(forgotCodeRequestButton, false, "");
+      }
+    }
+
+    async function handleForgotResetPassword(event) {
+      event.preventDefault();
+      const email = String(forgotEmailInput?.value || "").trim() || pendingForgotEmail;
+      const code = normalizeOtp(forgotCodeInput?.value);
+      const newPasswordInput = document.getElementById("forgot-new-password");
+      const newPassword = String(newPasswordInput?.value || "");
+      if (!isValidEmail(email)) {
+        setFeedback("Enter your account email first.");
+        forgotEmailInput?.focus();
+        return;
+      }
+      if (!/^\d{6}$/.test(code)) {
+        setFeedback("Enter the 6-digit reset code.");
+        forgotCodeInput?.focus();
+        return;
+      }
+      if (newPassword.length < 8) {
+        setFeedback("Use a new password with at least 8 characters.");
+        newPasswordInput?.focus();
+        return;
+      }
+      setButtonBusy(forgotResetButton, true, "Resetting...");
+      try {
+        await apiRequest("/api/auth/password/reset-otp", {
+          body: JSON.stringify({ code, email, newPassword }),
+          method: "POST"
+        });
+        showToast("Password reset successful. Please log in.", "success");
+        setAuthMode("login");
+      } catch (error) {
+        setFeedback(error.message);
+      } finally {
+        setButtonBusy(forgotResetButton, false, "");
+      }
+    }
+
+    async function handleResendVerifyCode() {
+      try {
+        await requestVerificationCode(pendingVerificationEmail);
+        showToast("A new verification code has been sent.", "success");
+      } catch (error) {
+        setFeedback(error.message);
+      }
+    }
+
     async function handleLogout() {
       await logout();
       showToast("Signed out successfully.", "success");
@@ -359,9 +500,23 @@ export default function LandingPage() {
 
     const handleTabClick = (e) => setAuthMode(e.currentTarget.dataset.authTab || "register");
     for (const tab of authTabs) tab.addEventListener("click", handleTabClick);
+    const modeSwitchers = document.querySelectorAll("[data-auth-mode]");
+    const handleModeSwitch = (e) => {
+      const mode = e.currentTarget.dataset.authMode;
+      if (mode === "forgot" && forgotEmailInput && loginForm) {
+        const loginEmail = String(new FormData(loginForm).get("email") || "").trim();
+        if (loginEmail) forgotEmailInput.value = loginEmail;
+      }
+      if (mode) setAuthMode(mode);
+    };
+    modeSwitchers.forEach((node) => node.addEventListener("click", handleModeSwitch));
 
     if (registerForm) registerForm.addEventListener("submit", handleRegisterSubmit);
     if (loginForm) loginForm.addEventListener("submit", handleLoginSubmit);
+    if (verifyForm) verifyForm.addEventListener("submit", handleVerifySubmit);
+    if (forgotCodeRequestButton) forgotCodeRequestButton.addEventListener("click", handleForgotRequestCode);
+    if (forgotResetButton) forgotResetButton.addEventListener("click", handleForgotResetPassword);
+    if (resendVerifyButton) resendVerifyButton.addEventListener("click", handleResendVerifyCode);
     if (navLogoutButton) navLogoutButton.addEventListener("click", handleLogout);
     const handleCloseAuthDialog = () => authDialog.close();
     if (closeAuthDialogButton) closeAuthDialogButton.addEventListener("click", handleCloseAuthDialog);
@@ -443,8 +598,13 @@ export default function LandingPage() {
       );
       for (const trigger of authTriggers) trigger.removeEventListener("click", handleAuthTriggerClick);
       for (const tab of authTabs) tab.removeEventListener("click", handleTabClick);
+      modeSwitchers.forEach((node) => node.removeEventListener("click", handleModeSwitch));
       if (registerForm) { registerForm.removeEventListener("submit", handleRegisterSubmit); registerForm.removeEventListener("input", handleInput); }
       if (loginForm) { loginForm.removeEventListener("submit", handleLoginSubmit); loginForm.removeEventListener("input", handleInput); }
+      if (verifyForm) verifyForm.removeEventListener("submit", handleVerifySubmit);
+      if (forgotCodeRequestButton) forgotCodeRequestButton.removeEventListener("click", handleForgotRequestCode);
+      if (forgotResetButton) forgotResetButton.removeEventListener("click", handleForgotResetPassword);
+      if (resendVerifyButton) resendVerifyButton.removeEventListener("click", handleResendVerifyCode);
       if (navLogoutButton) navLogoutButton.removeEventListener("click", handleLogout);
       if (closeAuthDialogButton) closeAuthDialogButton.removeEventListener("click", handleCloseAuthDialog);
       passwordToggleButtons.forEach(button => button.removeEventListener("click", handlePasswordToggle));
@@ -667,6 +827,35 @@ export default function LandingPage() {
                 </div>
               </label>
               <button className="btn btn-primary wide-button" type="submit">Continue to Workspace</button>
+              <button className="btn btn-ghost wide-button" type="button" data-auth-mode="forgot">Forgot Password?</button>
+            </form>
+          </section>
+          <section className="auth-panel" id="verify-panel" hidden={true}>
+            <form id="verify-form">
+              <p className="modal-subtitle">Enter the 6-digit code sent to your email to verify your account.</p>
+              <label className="field"><span>Verification Code</span><input type="text" id="verify-code" inputMode="numeric" maxLength="6" placeholder="123456" required={true} /></label>
+              <button className="btn btn-primary wide-button" type="submit">Verify Email</button>
+              <button className="btn btn-secondary wide-button" type="button" id="resend-verify-code">Resend Code</button>
+              <button className="btn btn-ghost wide-button" type="button" data-auth-mode="login">Back to Login</button>
+            </form>
+          </section>
+          <section className="auth-panel" id="forgot-panel" hidden={true}>
+            <form id="forgot-form">
+              <p className="modal-subtitle">Reset password using a one-time code sent to your email.</p>
+              <label className="field"><span>Email</span><input type="email" id="forgot-email" required={true} /></label>
+              <div className="auth-inline-actions">
+                <button className="btn btn-secondary wide-button" type="button" id="forgot-request-code">Send Reset Code</button>
+              </div>
+              <label className="field"><span>Reset Code</span><input type="text" id="forgot-code" inputMode="numeric" maxLength="6" placeholder="123456" /></label>
+              <label className="field">
+                <span>New Password</span>
+                <div className="input-action-row">
+                  <input type="password" id="forgot-new-password" required={true} />
+                  <button className="input-action" type="button" data-toggle-password="forgot-new-password">Show</button>
+                </div>
+              </label>
+              <button className="btn btn-primary wide-button" type="button" id="forgot-reset-password">Reset Password</button>
+              <button className="btn btn-ghost wide-button" type="button" data-auth-mode="login">Back to Login</button>
             </form>
           </section>
         </div>

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { readFile, stat } from "fs/promises";
 import http from "http";
 import https from "https";
+import nodemailer from "nodemailer";
 import path from "path";
 import { fileURLToPath } from "url";
 import { MongoClient } from "mongodb";
@@ -516,6 +517,63 @@ function verifyPassword(password, storedHash) {
   return safeEqualText(savedHash, currentHash);
 }
 
+function hashOneTimeCode(code) {
+  return crypto
+    .createHash("sha256")
+    .update(String(code || ""))
+    .digest("hex");
+}
+
+function generateOtpCode(length = 6) {
+  const digits = "0123456789";
+  let code = "";
+  for (let index = 0; index < length; index += 1) {
+    code += digits[crypto.randomInt(0, digits.length)];
+  }
+  return code;
+}
+
+function isEmailTransportConfigured() {
+  return Boolean(
+    String(process.env.SMTP_HOST || "").trim() &&
+    String(process.env.SMTP_PORT || "").trim() &&
+    String(process.env.SMTP_USER || "").trim() &&
+    String(process.env.SMTP_PASS || "").trim() &&
+    String(process.env.SMTP_FROM || "").trim()
+  );
+}
+
+async function sendOtpEmail({ to, subject, introLine, code, expiresInMinutes }) {
+  const host = String(process.env.SMTP_HOST || "").trim();
+  const port = Number(process.env.SMTP_PORT || 0);
+  const user = String(process.env.SMTP_USER || "").trim();
+  const pass = String(process.env.SMTP_PASS || "").trim();
+  const from = String(process.env.SMTP_FROM || "").trim();
+
+  if (!isEmailTransportConfigured()) {
+    if (!IS_PRODUCTION) {
+      console.log(`[DEV OTP] ${subject} -> ${to}: ${code}`);
+      return;
+    }
+    throw new Error("Email delivery is not configured.");
+  }
+
+  const transport = nodemailer.createTransport({
+    auth: { pass, user },
+    host,
+    port,
+    secure: port === 465
+  });
+
+  await transport.sendMail({
+    from,
+    html: `<p>${introLine}</p><p><strong style="font-size:20px;letter-spacing:2px;">${code}</strong></p><p>This code expires in ${expiresInMinutes} minutes.</p>`,
+    subject,
+    text: `${introLine}\n\n${code}\n\nThis code expires in ${expiresInMinutes} minutes.`,
+    to
+  });
+}
+
 function signSessionPayload(encodedPayload) {
   return crypto
     .createHmac("sha256", EFFECTIVE_SESSION_SECRET)
@@ -623,6 +681,8 @@ async function buildPublicUser(user) {
     course: user.course || "",
     createdAt: user.createdAt,
     email: user.email,
+    emailVerified: Boolean(user.emailVerifiedAt),
+    emailVerifiedAt: String(user.emailVerifiedAt || "").trim(),
     id: user.id,
     name: user.name,
     profileUpdatedAt: user.profileUpdatedAt || "",
@@ -774,7 +834,10 @@ async function handleRegister(req, res) {
       course,
       createdAt: new Date().toISOString(),
       email,
+      emailVerification: null,
+      emailVerifiedAt: "",
       id: crypto.randomUUID(),
+      passwordReset: null,
       name,
       passwordHash: hashPassword(password),
       role: "Member",
@@ -848,6 +911,250 @@ function handleLogout(res) {
     { message: "Signed out successfully." },
     { "Set-Cookie": buildExpiredSessionCookie() }
   );
+}
+
+const OTP_EXPIRY_MINUTES = 10;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+
+function buildOtpResponseMeta(code) {
+  if (!IS_PRODUCTION && !isEmailTransportConfigured()) {
+    return { devCode: code };
+  }
+  return {};
+}
+
+async function handleRequestEmailVerification(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const requestedEmail = normalizeEmail(body.email);
+    const authUser = await getAuthenticatedUser(req);
+    const users = await readUsers();
+    const user = authUser || users.find((candidate) => candidate.email === requestedEmail);
+
+    if (!user) {
+      sendJson(res, 404, { error: "No account found with that email." });
+      return;
+    }
+
+    if (user.emailVerifiedAt) {
+      sendJson(res, 200, { message: "Email is already verified." });
+      return;
+    }
+
+    const previousSentAt = Date.parse(user.emailVerification?.sentAt || 0);
+    if (Number.isFinite(previousSentAt) && Date.now() - previousSentAt < OTP_RESEND_COOLDOWN_MS) {
+      sendJson(res, 429, { error: "Please wait before requesting another code." });
+      return;
+    }
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+    await sendOtpEmail({
+      code,
+      expiresInMinutes: OTP_EXPIRY_MINUTES,
+      introLine: "Use this code to verify your email address for CollabSpace:",
+      subject: "CollabSpace email verification code",
+      to: user.email
+    });
+
+    await updateDoc("users", { id: user.id }, {
+      $set: {
+        emailVerification: {
+          codeHash: hashOneTimeCode(code),
+          expiresAt,
+          sentAt: new Date().toISOString()
+        }
+      }
+    });
+
+    sendJson(res, 200, {
+      message: "Verification code sent to your email.",
+      ...buildOtpResponseMeta(code)
+    });
+  } catch (error) {
+    sendJson(res, 400, { error: error?.message || "Could not send verification code." });
+  }
+}
+
+async function handleConfirmEmailVerification(req, res) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    sendJson(res, 401, { error: "Not authenticated." });
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const code = String(body.code || "").trim();
+    if (!/^\d{6}$/.test(code)) {
+      sendJson(res, 400, { error: "Enter the 6-digit verification code." });
+      return;
+    }
+
+    const verification = user.emailVerification || {};
+    const isExpired = Date.parse(verification.expiresAt || 0) < Date.now();
+    if (!verification.codeHash || isExpired) {
+      sendJson(res, 400, { error: "Verification code is expired. Request a new code." });
+      return;
+    }
+
+    if (!safeEqualText(hashOneTimeCode(code), String(verification.codeHash || ""))) {
+      sendJson(res, 400, { error: "Incorrect verification code." });
+      return;
+    }
+
+    const nextVerifiedAt = new Date().toISOString();
+    await updateDoc("users", { id: user.id }, {
+      $set: { emailVerifiedAt: nextVerifiedAt },
+      $unset: { emailVerification: "" }
+    });
+
+    const refreshedUsers = await readUsers();
+    const updatedUser = refreshedUsers.find((candidate) => candidate.id === user.id) || user;
+    sendJson(res, 200, {
+      message: "Email verified successfully.",
+      user: await buildPublicUser(updatedUser)
+    });
+  } catch {
+    sendJson(res, 400, { error: "Could not verify email." });
+  }
+}
+
+async function handleRequestPasswordResetOtp(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const email = normalizeEmail(body.email);
+    if (!validateEmail(email)) {
+      sendJson(res, 400, { error: "Please enter a valid email address." });
+      return;
+    }
+
+    const users = await readUsers();
+    const user = users.find((candidate) => candidate.email === email);
+    if (!user) {
+      sendJson(res, 404, { error: "No account found with that email." });
+      return;
+    }
+
+    const previousSentAt = Date.parse(user.passwordReset?.sentAt || 0);
+    if (Number.isFinite(previousSentAt) && Date.now() - previousSentAt < OTP_RESEND_COOLDOWN_MS) {
+      sendJson(res, 429, { error: "Please wait before requesting another code." });
+      return;
+    }
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+    await sendOtpEmail({
+      code,
+      expiresInMinutes: OTP_EXPIRY_MINUTES,
+      introLine: "Use this code to reset your CollabSpace password:",
+      subject: "CollabSpace password reset code",
+      to: user.email
+    });
+
+    await updateDoc("users", { id: user.id }, {
+      $set: {
+        passwordReset: {
+          codeHash: hashOneTimeCode(code),
+          expiresAt,
+          sentAt: new Date().toISOString()
+        }
+      }
+    });
+
+    sendJson(res, 200, {
+      message: "Password reset code sent to your email.",
+      ...buildOtpResponseMeta(code)
+    });
+  } catch (error) {
+    sendJson(res, 400, { error: error?.message || "Could not send reset code." });
+  }
+}
+
+async function handleResetPasswordWithOtp(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const email = normalizeEmail(body.email);
+    const code = String(body.code || "").trim();
+    const newPassword = String(body.newPassword || "");
+
+    if (!validateEmail(email)) {
+      sendJson(res, 400, { error: "Please enter a valid email address." });
+      return;
+    }
+    if (!/^\d{6}$/.test(code)) {
+      sendJson(res, 400, { error: "Enter the 6-digit reset code." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      sendJson(res, 400, { error: "Use a password with at least 8 characters." });
+      return;
+    }
+
+    const users = await readUsers();
+    const user = users.find((candidate) => candidate.email === email);
+    if (!user) {
+      sendJson(res, 404, { error: "No account found with that email." });
+      return;
+    }
+
+    const passwordReset = user.passwordReset || {};
+    const isExpired = Date.parse(passwordReset.expiresAt || 0) < Date.now();
+    if (!passwordReset.codeHash || isExpired) {
+      sendJson(res, 400, { error: "Reset code is expired. Request a new code." });
+      return;
+    }
+
+    if (!safeEqualText(hashOneTimeCode(code), String(passwordReset.codeHash || ""))) {
+      sendJson(res, 400, { error: "Incorrect reset code." });
+      return;
+    }
+
+    await updateDoc("users", { id: user.id }, {
+      $set: { passwordHash: hashPassword(newPassword) },
+      $unset: { passwordReset: "" }
+    });
+
+    sendJson(res, 200, { message: "Password reset successful. You can now sign in." });
+  } catch {
+    sendJson(res, 400, { error: "Could not reset password." });
+  }
+}
+
+async function handleChangePasswordWithCurrent(req, res) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    sendJson(res, 401, { error: "Not authenticated." });
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const currentPassword = String(body.currentPassword || "");
+    const newPassword = String(body.newPassword || "");
+
+    if (!currentPassword) {
+      sendJson(res, 400, { error: "Current password is required." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      sendJson(res, 400, { error: "Use a password with at least 8 characters." });
+      return;
+    }
+    if (!verifyPassword(currentPassword, user.passwordHash)) {
+      sendJson(res, 401, { error: "Current password is incorrect." });
+      return;
+    }
+    if (verifyPassword(newPassword, user.passwordHash)) {
+      sendJson(res, 400, { error: "New password must be different from your current password." });
+      return;
+    }
+
+    await updateDoc("users", { id: user.id }, { $set: { passwordHash: hashPassword(newPassword) } });
+    sendJson(res, 200, { message: "Password updated successfully." });
+  } catch {
+    sendJson(res, 400, { error: "Could not update password." });
+  }
 }
 
 /* ── Task endpoints ──────────────────────────────────── */
@@ -2031,6 +2338,31 @@ export default async function handler(req, res) {
 
     if (req.method === "POST" && pathname === "/api/auth/logout") {
       handleLogout(res);
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/verify-email/request") {
+      await handleRequestEmailVerification(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/verify-email/confirm") {
+      await handleConfirmEmailVerification(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/password/forgot/request") {
+      await handleRequestPasswordResetOtp(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/password/reset-otp") {
+      await handleResetPasswordWithOtp(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/password/change") {
+      await handleChangePasswordWithCurrent(req, res);
       return;
     }
 

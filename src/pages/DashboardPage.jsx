@@ -912,16 +912,20 @@ function buildContributionModel() {
       });
 
       const completedCount = assignedTasks.filter(isContributionTaskCompleted).length;
+      const assignedOpenCount = assignedTasks.filter((task) => !isContributionTaskCompleted(task)).length;
+      const assignedTotal = assignedTasks.length;
       const percentage = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
       return {
+        assignedOpenCount,
+        assignedTotal,
         color: CONTRIBUTION_PALETTE[index % CONTRIBUTION_PALETTE.length],
         completedCount,
         initials: initialsForName(member.name),
         name: String(member.name || "Unnamed member").trim(),
         percentage,
         role: String(member.role || "Member").trim() || "Member",
-        totalTasks
+        workspaceTaskTotal: totalTasks
       };
     })
     .sort((left, right) => right.completedCount - left.completedCount || left.name.localeCompare(right.name));
@@ -1012,8 +1016,12 @@ function buildContributionCardsMarkup(model) {
         <span class="contribution-member-progress-fill"></span>
       </div>
       <div class="contribution-member-stats">
-        <span>${escapeHtml(member.completedCount)} / ${escapeHtml(member.totalTasks)} tasks completed</span>
-        <span>${escapeHtml(Math.max(member.totalTasks - member.completedCount, 0))} remaining</span>
+        <span>${escapeHtml(member.completedCount)} / ${escapeHtml(member.workspaceTaskTotal)} team tasks done</span>
+        <span>${
+          member.assignedTotal === 0
+            ? "Not on any task"
+            : `${escapeHtml(member.assignedOpenCount)} open on yours`
+        }</span>
       </div>
     </article>
   `).join("");
