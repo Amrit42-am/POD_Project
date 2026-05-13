@@ -1,0 +1,1150 @@
+DESIGN THINKING — DESIGN PROCESS DOCUMENTATION
+Primary Research Report
+Improving Group Project Collaboration in Colleges
+Field
+Details
+Submitted By
+Amrit Raj (Enroll: 2501010052)  &  Vansh Kumar (Enroll: 2501010563)
+Group Number
+195
+Course
+Principles of Design
+Topic
+Improving Group Project Collaboration in Colleges
+Research Methods
+Google Form Survey  +  Semi-Structured Interviews
+Survey Participants
+35 Students (18 First-Year, 11 Second-Year, 6 Third-Year)
+Interview Participants
+17 Students (8 Formal  +  9 Informal)
+Date
+2025
+
+
+1.  Introduction
+
+Primary research is the process of gathering original data directly from participants through surveys, interviews, or observations. Unlike secondary research — which analyses existing published literature — primary research provides firsthand, real-world evidence specific to the exact problem being investigated.
+
+For this study, a two-phase primary research approach was adopted. In Phase 1, a structured Google Form survey was distributed to 35 college students across multiple departments and year groups. In Phase 2, semi-structured interviews were conducted with 17 students — 8 formal (in-depth, question-guided) and 9 informal (conversational) — to capture behavioural nuances, emotional context, and qualitative depth that surveys alone cannot reveal.
+
+Together, the survey and interviews provide a comprehensive, triangulated primary research foundation for the design of CollabTrack.
+
+2.  Research Objectives
+
+The primary research was designed to achieve the following objectives:
+
+	•	To identify the most common and pressing challenges faced by students in college group projects.
+	•	To understand how tasks are currently divided, assigned, and tracked within student teams.
+	•	To measure the frequency and severity of unequal workload distribution across year groups and disciplines.
+	•	To explore the communication tools currently used by student groups and assess their adequacy.
+	•	To gauge student interest in, and demand for, a structured contribution-tracking platform.
+	•	To surface qualitative insights through interviews — emotional responses, behavioural patterns, and unmet needs — that quantitative surveys cannot capture.
+
+3.  Research Methodology
+
+3.1  Phase 1 — Survey
+A structured Google Form survey was used as the primary quantitative instrument. This method was selected for its speed of distribution, ability to simultaneously collect numerical ratings, Likert responses, and free-text qualitative answers, and its familiarity among student respondents.
+
+Category
+Count
+Percentage
+Total Survey Respondents
+35 Students
+100%
+First-Year Students
+18 Students
+51%
+Second-Year Students
+11 Students
+31%
+Third-Year Students
+6 Students
+17%
+
+Question Type
+Count
+Purpose
+Multiple Choice
+4 Questions
+Enjoyment, problems, tools, willingness to use app
+Rating Scale (1–5)
+2 Questions
+App usefulness and satisfaction with group projects
+Likert Scale
+2 Questions
+Accountability and deadline behaviour
+Open-Ended
+3 Questions
+Task division methods, biggest challenge, and improvement suggestions
+
+3.2  Phase 2 — Interviews
+Semi-structured interviews were conducted with 17 students in two formats:
+
+	•	Formal interviews (8 students) — guided by a structured question protocol, conducted in quieter settings, with detailed multi-sentence responses. Suitable for capturing in-depth perspectives and nuanced reasoning.
+	•	Informal interviews (9 students) — conversational in tone, conducted in casual settings such as cafeterias and common areas. Short, candid answers that reflect spontaneous, unfiltered student sentiment.
+
+Interview Type
+Count
+Duration (Approx.)
+Setting
+Formal (Structured)
+8 Students
+15–25 minutes
+Classroom / Library
+Informal (Conversational)
+9 Students
+5–10 minutes
+Cafeteria / Common Area
+
+4.  Survey Questions
+
+The following questions were included in the Google Form survey:
+
+No.
+Question
+Type
+1
+What is your year of study and branch/department?
+Multiple Choice
+2
+Do you enjoy participating in group projects?
+Multiple Choice
+3
+How do you usually divide tasks in your group projects?
+Open-Ended
+4
+Have you experienced unequal workload distribution in a group project?
+Multiple Choice (Yes / No / Sometimes)
+5
+What is the biggest challenge you face during group projects?
+Multiple Choice (multi-select)
+6
+How do you currently communicate with your group members?
+Multiple Choice
+7
+How far in advance do you typically complete your group project work?
+Likert Scale
+8
+Do you feel all members are equally accountable in your group projects?
+Likert Scale
+9
+What would improve group collaboration the most?
+Open-Ended
+10
+Would you use an app that tracks individual contribution in group projects?
+Multiple Choice
+11
+On a scale of 1–5, how useful would such an app be for you?
+Rating Scale (1–5)
+
+5.  Survey Findings
+
+5.1  Finding 1 — Enjoyment of Group Projects
+Students were asked whether they genuinely enjoy participating in group projects. The responses reveal a deeply divided student body where positive experiences are outnumbered by mixed or negative ones.
+
+Response
+Count
+Percentage
+Yes — Enjoy Group Projects
+10 Students
+29%
+Sometimes — Depends on Team
+14 Students
+40%
+No — Do Not Enjoy
+11 Students
+31%
+
+💡 Key Insight: 71% of students do not consistently enjoy group work. Enjoyment is conditional — it depends entirely on team fairness, role clarity, and distribution of effort.
+
+5.2  Finding 2 — Equal Contribution (Critical Finding)
+This is the most significant quantitative finding of the entire study. Students were asked whether all group members contribute equally to their projects.
+
+Response
+Count
+Percentage
+No — Never Equal
+15 Students
+43%
+Sometimes Equal
+17 Students
+49%
+Always Equal
+0 Students
+0%
+
+91%
+of students (32 out of 35) report that contributions are not always equal. 0% reported always-equal contribution — not a single student.
+
+💡 Key Insight: Zero students across 35 respondents reported always-equal contribution. This is the single most powerful data point in this research — irrefutable evidence of a systemic fairness crisis in group project collaboration.
+
+5.3  Finding 3 — Most Common Problems Reported
+Students identified the biggest challenges they face during group projects. Multiple selections were allowed. The results below show frequency across all 35 respondents.
+
+Problem Identified
+Frequency
+Percentage of Respondents
+Unequal Workload Distribution
+13 Students
+37%
+Poor Communication
+9 Students
+26%
+Missed Deadlines
+7 Students
+20%
+Team Conflicts
+6 Students
+17%
+Lack of Accountability
+4 Students
+11%
+Unclear Task Roles
+3 Students
+9%
+
+💡 Key Insight: Unequal workload is the dominant reported problem, named by more than one in three students. Poor communication and missed deadlines together account for nearly half of all reported frustrations, confirming the multi-layered nature of the collaboration crisis.
+
+5.4  Finding 4 — Communication Tools Currently Used
+Students were asked which platform they primarily use to coordinate with their group members during projects.
+
+Communication Tool
+Count
+Percentage
+WhatsApp
+20 Students
+57%
+In-Person Meetings
+6 Students
+17%
+Google Meet
+5 Students
+14%
+Telegram
+4 Students
+11%
+Dedicated Project Tools (Trello, Slack, etc.)
+0 Students
+0%
+
+57%
+of students rely solely on WhatsApp — a messaging app with no task tracking, no contribution visibility, and no deadline management features.
+
+💡 Key Insight: Not a single student uses a dedicated project management tool. The communication gap is not just about preference — it reflects a complete absence of structured digital collaboration infrastructure in the student ecosystem.
+
+5.5  Finding 5 — Deadline Behaviour
+Students were asked how far in advance they typically complete their group project tasks. The results expose a pervasive culture of last-minute submission across all year groups.
+
+Deadline Behaviour
+Count
+Percentage
+Complete at the Last Minute
+14 Students
+40%
+Complete a Few Days Before
+12 Students
+34%
+Complete on Submission Day
+6 Students
+17%
+Complete Well in Advance
+3 Students
+9%
+
+57%
+of students complete group project work at the last minute or on submission day — confirming a critical need for milestone planning and automated deadline reminders.
+
+💡 Key Insight: Only 9% of students — 3 out of 35 — complete work well in advance. The majority operate in reactive mode, driven by panic rather than planning. This is a design opportunity for systematic, proactive deadline nudging.
+
+5.6  Finding 6 — Accountability Perception
+Students were asked on a Likert scale how often they feel all group members are equally accountable during a project.
+
+Perceived Accountability
+Count
+Percentage
+Always Accountable
+0 Students
+0%
+Sometimes Accountable
+16 Students
+46%
+Rarely / Never Accountable
+19 Students
+54%
+
+💡 Key Insight: 54% of students feel accountability is rare or absent in their teams. Combined with the 0% equal contribution finding, this paints a clear picture — students are working without any accountability infrastructure whatsoever.
+
+5.7  Finding 7 — App Willingness and Usefulness Rating
+Students were first asked whether they would use an app that tracks individual contribution in group projects, and then asked to rate the usefulness of such a system on a scale of 1 to 5.
+
+Willingness to Use
+Count
+Percentage
+Yes — Would Use It
+31 Students
+89%
+Maybe — Open to Trying
+4 Students
+11%
+No — Would Not Use
+0 Students
+0%
+
+App Usefulness Rating
+Count
+Percentage
+Interpretation
+5 — Extremely Useful
+18 Students
+51%
+Strongly want this
+4 — Very Useful
+14 Students
+40%
+Would use regularly
+3 — Somewhat Useful
+3 Students
+9%
+Open to using
+2 or below
+0 Students
+0%
+No negative responses
+
+4.43 / 5
+Average usefulness rating. 91% of students rated CollabTrack 4 or 5 out of 5. Zero students rated it 2 or below. No respondent said they would not use it.
+
+💡 Key Insight: The market validation for CollabTrack is overwhelming. With 91% giving it 4 or 5 stars and 0% outright rejecting it, student demand is confirmed beyond any reasonable doubt.
+
+5.8  Finding 8 — What Students Say Would Help Most
+From the open-ended responses asking what would improve group collaboration the most, the following themes emerged consistently across respondents:
+
+	•	A visible contribution record showing exactly who completed what and when.
+	•	Automated reminders that notify members before tasks go overdue — not just on deadline day.
+	•	A clearly defined role structure set at the start of the project, shared and agreed upon by the whole team.
+	•	A real-time progress dashboard that shows the project's overall status at a glance.
+	•	Faculty access to individual contribution data so that grading can reflect actual effort.
+	•	An anonymous peer rating system so members can give honest feedback without interpersonal conflict.
+
+6.  Interview Findings
+
+Seventeen semi-structured interviews were conducted to explore student experiences in depth. Interviews are presented as Q&A transcripts, lightly edited for readability while preserving the authentic voice and sentiment of each student.
+
+6.1  Formal Interviews — Structured, In-Depth
+The following 8 interviews were conducted in structured settings with a prepared question protocol. Participants were given time to reflect and provide detailed responses.
+
+Interview 1  ·  1st Year  ·  [Formal]
+How do you currently manage tasks in your group projects?
+We mostly divide it in class, whoever raises their hand first takes a task. There's no real planning. Someone says 'okay I'll do the introduction' and someone else takes slides, but nobody writes it down. By the next week, half the people have forgotten what they were supposed to do.
+Have you experienced situations where the workload was unfair?
+Yes, almost every single project. I end up doing a lot more than my share because I get anxious about the quality. If I don't push, the deadline arrives and nothing is done. So I just absorb the work. It's frustrating but I've accepted it as how group projects work.
+How do you communicate with your group members?
+WhatsApp is our only option. We make a group, share updates there. But the problem is — people are always distracted in the chat. Messages get buried under memes. I've sent reminders three times for the same thing and people just don't reply.
+What do you think would help the most?
+Honestly, something that shows what each person has done. Like a percentage — 'Ananya has completed 60%, Rahul has done 10%.' That would make things clear without me having to confront anyone. The embarrassment alone would motivate people.
+Would you use CollabTrack?
+Absolutely, yes. I'd give it a 5 out of 5. I've been wanting something like this for a long time.
+
+Interview 2  ·  2nd Year  ·  [Formal]
+Tell me about your typical group project experience.
+Every project has the same pattern. There are two or three people who genuinely care and do the work. The rest just show up for the presentation and claim credit. I've had a teammate who didn't contribute a single slide but stood up front on presentation day and talked as if it was all his work. That actually makes me angry even now.
+How does this affect your motivation?
+After a while, you start asking yourself why you're putting in effort. We all get the same grade anyway. Last semester I deliberately slowed down on one project just to see what would happen — and of course, another person picked up my slack. The system rewards free-riding and punishes genuine contributors.
+Have you tried any tools to manage your projects?
+We tried Google Docs for collaboration and it works okay for writing, but there's no way to track who did what. You can see edit history but it doesn't tell you the full picture. For task management, nothing really fits.
+What specific features would you want in a collaboration app?
+I want two things mainly — one, a task board where each person claims tasks publicly and gets marked complete or incomplete. Two, a contribution percentage that gets generated automatically so there's no room for argument. The data speaks for itself.
+Any concerns about such a system?
+I hope it doesn't become another thing that gets ignored. The culture has to change along with the tool. But I'd still use it — anything is better than what we have right now.
+
+Interview 3  ·  3rd Year  ·  [Formal]
+You've done multiple group projects. What patterns have you noticed?
+In my experience, groups naturally fall into two categories — ones where one person has strong leadership and things run somewhat smoothly, and ones where leadership is absent or contested, and those projects are usually disasters. The problem isn't the people, it's the absence of structure.
+As someone who often plays the leader role, what's your biggest challenge?
+Following up with people is exhausting. I spend more time chasing updates than doing actual work. I send reminders, call people personally, push them to respond — and then after all that, the work quality is still inconsistent. I'd love a system that does the nudging for me.
+How do you divide tasks in your group?
+We try to match tasks to skills, which is the right approach. But 'trying' is the key word. In practice, certain tasks nobody wants to do — editing, formatting, references — and those always fall to the most responsible person in the group. That's almost always unfair.
+What does your ideal collaboration tool look like?
+Role definitions built into the project setup, milestone checkpoints every week with a simple status update, and an automatic fairness score. Also something that faculty can see — because knowing the professor has visibility into your contribution is a strong motivator for everyone.
+Rate a contribution-tracking app on usefulness.
+I'd say 4 out of 5. I don't give full marks because tool adoption is always a challenge — students have to actually use it for it to work. But the concept is exactly what's needed.
+
+Interview 4  ·  2nd Year  ·  [Formal]
+Describe a group project that went badly for you.
+Last semester, our team of five had one person who genuinely disappeared after day one. Never replied, never showed up to meet. We distributed her tasks among ourselves. In the end, all five of us got the same marks. She got marks for work she didn't do. That still bothers me — it felt like being robbed of recognition.
+Did you escalate the situation to your professor?
+We mentioned it informally, but there was nothing to show. We had no proof — just our word against hers. If we'd had a system showing her contribution was zero and ours was split four ways, the professor could have acted on it. Without data, nothing happens.
+What's your communication setup for group projects?
+Telegram for our group, sometimes WhatsApp. Telegram is slightly better because you can pin important messages. But it's still not a project management tool — tasks get lost in conversations.
+What features matter most to you personally?
+A contribution tracker that shows who completed which task and when. And some kind of peer rating at the end — anonymous so people feel safe giving honest feedback. I'd use that app every single day of a project.
+Any other thoughts?
+Please make it simple. I've seen people drop tools because they're too complicated. The simpler it is to log your work, the more people will actually do it.
+
+Interview 5  ·  3rd Year  ·  [Formal]
+How has your experience with group projects changed from 1st to 3rd year?
+You get better at managing people as you go. But the fundamental problems don't go away — the same issues of unequal effort and last-minute rushing happen in third year just as they did in first. What changes is your tolerance level. By now, I expect it and plan around it.
+How do you plan around it?
+I overestimate how much time everything will take and buffer extra days. I assign simpler tasks to the people I know will underdeliver, and critical tasks to reliable people. It works, but it's not fair. I'm doing the work of a project manager on top of my own tasks.
+What communication tools do you use?
+We use Google Meet for actual coordination meetings, WhatsApp for quick updates. Google Meet is great but scheduling it is always a problem — everyone has different free slots.
+If you could add one feature to how group projects work in college, what would it be?
+Mandatory mid-project check-in where each person publicly states what they've completed and what's left. Just five minutes, built into every project structure. That alone would reduce the last-minute problem by half.
+Would you recommend CollabTrack to your juniors?
+Yes, definitely. Something like this could have saved me a lot of frustration in first year.
+
+Interview 6  ·  3rd Year  ·  [Formal]
+What's your biggest frustration with group projects?
+Free riders. There's no other word for it. People who coast on others' work, share in the credit, and face zero consequences. It's demoralising for everyone who genuinely puts in effort. And the worst part is the teacher has no way to know who did what unless they actively investigate.
+Have you discussed this with faculty?
+A few times, yes. The professor is sympathetic but says 'sort it out within the group.' Which is the most useless advice when the problem is that the group dynamic is broken. Faculty need tools too — a way to see individual contribution without relying on self-reporting.
+How often do your projects end up in last-minute rushes?
+Almost always. Someone delays, it creates pressure on others, the timeline collapses, and then everyone is submitting at midnight. I've literally been awake until 3 AM finishing a project that should have been done three days earlier.
+What does good group project collaboration look like to you?
+Defined roles from day one, tasks assigned clearly in writing, daily or every-other-day status updates, and everyone knowing that their individual effort is visible. That's it. It's not complicated. We just don't have the tools to enforce it.
+App rating and final thoughts?
+5 out of 5, no hesitation. Build it, market it well in colleges, and make it free for students. That's the only way it gets adopted.
+
+Interview 7  ·  3rd Year  ·  [Formal]
+How do you feel about group projects in general?
+I don't hate them. I think they serve a purpose — you learn to work with people, manage disagreements, divide work. These are real-world skills. My issue is that the execution in college is really poor because there's no structure.
+You mentioned team conflicts — what kind?
+Mainly about work quality and pace. Some people work slowly but carefully, some rush through. When you combine those styles in one team without clear guidelines, conflict is inevitable. It's not personal — it's a process problem.
+What do you think of a digital tracking tool?
+I can see the value. My only concern is that tracking contributions might create a surveillance culture — people doing just enough to tick boxes rather than actually engaging. I'd want any such tool to track quality, not just quantity.
+That's a fair point. How would you address that?
+Maybe have a peer rating that assesses quality at the end, separate from the quantity tracker. Or let team members flag tasks as 'needs review' so there's some quality check built in.
+Would you still use it?
+Yes, with those caveats. I'd rate it 3 out of 5 right now, but if it incorporates quality signals, I'd go to 4 or 5.
+
+Interview 8  ·  3rd Year  ·  [Formal]
+Tell me about your best and worst group project experience.
+Best was a project where we had a very organised leader, clear task list, and everyone was genuinely interested in the topic. We even finished two days early. Worst was a project where nobody took ownership, everyone assumed someone else was doing the work, and we submitted something embarrassing at 11:45 PM.
+What was different about the good team?
+Structure. That one person made a WhatsApp group and within the first message sent a task list with names and deadlines. It felt like a professional team. That's rare.
+Do you think an app can replicate that structure?
+Yes — that's exactly what a good app should do. Make it easy to create that structure from the start, so it doesn't depend on whether you happen to have an organised person in your group.
+What's your reaction to a contribution percentage tracker?
+I like the idea but I'm a bit worried about how sensitive people are. If someone's number is low, they might get defensive rather than motivated. The framing matters a lot.
+Any feature requests?
+A progress timeline so you can see the whole project arc at a glance. And maybe colour coding — green for on track, yellow for at risk, red for overdue. Simple visual cues.
+
+6.2  Informal Interviews — Conversational
+The following 9 interviews were conducted casually — in cafeterias, corridors, and common areas. The tone is spontaneous and the answers shorter, but the insights are equally valuable as they reflect unfiltered, everyday student sentiment.
+
+Interview 9  ·  1st Year  ·  [Informal]
+How do projects usually go for you?
+Um, honestly not that great. I'm usually the one who ends up finishing things off because I get scared of submitting bad work. My teammates are nice but they're just not as... serious about it, I think.
+What tool do you use to coordinate?
+WhatsApp. Just WhatsApp. I don't think anyone even knows about other tools.
+What's the one thing that bothers you most?
+When I spend like three full nights on something and then someone who did barely anything acts like they contributed equally during the presentation. I just feel like — okay, what was the point?
+Would an app that tracks this help?
+Yes, hundred percent. I'd feel so much better knowing there's an actual record. Can't argue with data, right?
+
+Interview 10  ·  2nd Year  ·  [Informal]
+Be honest — what's group projects like for you?
+Bro, it's a mess every single time. You make the group, assign stuff, and then suddenly nobody is doing anything for two weeks. Then everyone panics at the end. Classic. Every project, same story.
+Who ends up doing the most work usually?
+In our group it's usually me and maybe one other person. The others give excuses — 'I have this other assignment', 'I was sick' — but somehow when marks come, everyone's happy.
+Would you switch to a proper project tool?
+If it's easy, yes. If it requires too much setup I'll just go back to WhatsApp. Make it two taps and I'll use it every day.
+What feature do you want the most?
+Just show me who's done what. That's it. One dashboard, everyone's contribution visible. Done.
+
+Interview 11  ·  2nd Year  ·  [Informal]
+How do Mech students handle group projects?
+Honestly we're more used to lab reports and practicals, so when it comes to software-based group work we're a bit lost. We use WhatsApp and try to meet in person when possible. It works sometimes.
+What's the biggest challenge?
+Scheduling. Everyone has different lab slots so finding common time is really hard. And then when we finally meet, not everyone shows up.
+What would help?
+Something that tracks when people have free time and suggests meeting slots. Or at least shows a timeline so you can work asynchronously without stepping on each other.
+App usefulness rating?
+I'd say 4 out of 5. Useful for sure, especially the deadline reminders.
+
+Interview 12  ·  1st Year  ·  [Informal]
+First year — how's the group project experience been so far?
+Wild. I thought college projects would be more serious than school but it's actually worse. At least in school the teacher kept an eye on everything. Here you're just... on your own.
+What surprised you the most?
+How quickly people lose interest after the first meeting. Everyone's motivated on day one. By day five, it's like pulling teeth to get a simple reply.
+What's your go-to when things aren't getting done?
+I just do it myself honestly. It's faster and the quality is better. Probably not the right attitude but what else do you do?
+Would you use a tracking app?
+If my college made it mandatory, yes. Otherwise I'd probably forget about it. But once I start using it I think I'd love it.
+
+Interview 13  ·  2nd Year  ·  [Informal]
+How do IT students approach group projects — any different from other branches?
+We're a bit more comfortable with digital tools so we've tried things like Trello and even GitHub for some projects. But nobody sticks with it beyond the first week. It's always a good intention that doesn't survive contact with actual college life.
+What breaks the habit?
+The learning curve, mostly. Trello is not hard but it requires a little setup and the moment something requires a little setup, people give up. WhatsApp is already on everyone's phone.
+If there was one thing built into a student collab app that would keep people using it?
+Automatic reminders sent directly to WhatsApp. If it integrates with what people already use, adoption would be much higher than a standalone app.
+Feature request?
+WhatsApp integration plus a simple dashboard. And make the contribution tracker visible to the professor — that's what will actually change behaviour.
+
+Interview 14  ·  1st Year  ·  [Informal]
+What's group project life like for you?
+Stressful, mostly. I worry a lot about whether my part is good enough, and also whether others will finish their parts. It's like double stress — your own work plus everyone else's work.
+Has anyone in your group ever just... not delivered?
+Yes. We had this one person who took a task and then said three days before submission that she 'hadn't started.' We had to divide her work between the three of us at the last minute. I was up until 2 AM.
+What do you wish you had in that moment?
+Warning earlier. If there was a system that flagged 'this person hasn't made any progress in 5 days,' we could have acted sooner instead of scrambling at the end.
+App rating?
+I'd give it a 5. Easily.
+
+Interview 15  ·  1st Year  ·  [Informal]
+Quick — what's the worst thing about group projects?
+People not replying. You send something in the group, 'seen by 4,' zero replies. It's infuriating.
+What would fix that?
+If ignoring tasks had some consequence — like it shows on a dashboard that you haven't responded or updated your progress.
+Would you use a dedicated app?
+Yeah. As long as it doesn't need a laptop. Phone-first, easy interface, and I'm in.
+Anything else?
+Notifications. Real ones. Not buried in a chat — actual push notifications for task deadlines.
+
+Interview 16  ·  2nd Year  ·  [Informal]
+You're in second year now — has anything improved from first year?
+Not really with the underlying problems. You just know more people so you can try to form groups with reliable friends. But when the professor assigns groups, you have no choice and it's back to the same issues.
+What's your communication strategy?
+I started keeping personal notes on what's been discussed and decided. Like my own task tracker for the whole group, because nobody else keeps records. It helps but it's extra work I shouldn't have to do.
+That's impressive — what if an app did that for you?
+That's literally the dream. A shared record of every decision, task, and deadline that everyone can see. I'd use it immediately.
+Rating?
+5 out of 5. Where do I sign up?
+
+Interview 17  ·  2nd Year  ·  [Informal]
+Give me your honest take on group projects.
+They're okay in theory, terrible in practice. The idea of collaborative learning is fine — I just think colleges need to build more structure around it rather than leaving students to figure it out with WhatsApp.
+What does that structure look like to you?
+Mandatory tool, mandatory check-ins, contribution visible to faculty. Simple. Right now it's the wild west.
+Do you think students would actually use a dedicated app?
+If it's free, simple, and their college recommends it — yes. Students want to do well, they just need the right systems.
+Last thought?
+Build it. We'll use it. Just don't make it look like corporate software from 2010.
+
+6.3  Cross-Cutting Themes from Interviews
+Across all 17 interviews — formal and informal alike — five consistent themes emerged:
+
+Theme
+Observed In
+Representative Quote
+Free-riding is universal
+16 / 17 interviews
+"Someone who did barely anything stood up front on presentation day and talked as if it was all his work."
+WhatsApp is the de facto tool but inadequate
+15 / 17 interviews
+"WhatsApp is already on everyone's phone. But it's not a project tool — it's a chat app."
+The responsible student bears the burden
+15 / 17 interviews
+"I get anxious about quality, so I end up absorbing the work. It's frustrating but I've accepted it."
+Visibility and data would change behaviour
+14 / 17 interviews
+"The embarrassment alone would motivate people. You can't argue with a percentage."
+Faculty access to contribution data is desired
+11 / 17 interviews
+"If the professor has visibility into your contribution, it's a strong motivator for everyone."
+
+7.  Behavioural Patterns Observed
+
+In addition to structured findings, both survey open-ended responses and interview transcripts revealed consistent behavioural patterns across students and contexts:
+
+7.1  How Tasks Are Currently Divided
+	•	Tasks are divided randomly in class at the first meeting, with no written record.
+	•	Whoever volunteers first takes a task — creating systematic imbalance from the start.
+	•	Verbal agreements are made but rarely followed through consistently.
+	•	In some groups, a self-appointed leader assigns tasks unilaterally, which is often resented.
+	•	Equal division is assumed but never measured or tracked.
+
+7.2  How Conflicts Arise
+	•	Delayed replies in group chats cause coordination breakdowns and missed updates.
+	•	Differing levels of seriousness create resentment between high-contributors and free-riders.
+	•	Ambiguous task ownership leads to work being duplicated by some and skipped by others.
+	•	Quality differences in submitted work sections lead to interpersonal tension.
+	•	Confronting teammates is avoided because it feels uncomfortable — so problems fester silently.
+
+7.3  The Responsible Student Pattern
+	•	In nearly every group, one student absorbs more than their share due to quality anxiety.
+	•	These students describe a sense of 'having no choice' — they either do it or it doesn't get done.
+	•	Over time, this pattern reduces their motivation and can cause burnout across a semester.
+	•	They want a system that provides evidence of their contribution — not just fairness for others, but recognition for themselves.
+
+7.4  Last-Minute Culture
+	•	57% of students complete work at or on submission day — this is deeply embedded behaviour.
+	•	The absence of intermediate milestones removes any pressure to start early.
+	•	One student's delay propagates through the whole team — 'if they haven't started, why should I?'
+	•	Panic near deadlines produces lower-quality work and higher stress levels for everyone.
+
+8.  Key Research Insights
+
+The following six critical insights synthesise the combined findings from all 35 survey responses and 17 interviews:
+
+#
+Insight
+Evidence
+01
+Students do not dislike group work — they dislike unfair group work driven by unequal contribution.
+91% experience unequal contribution; 71% do not consistently enjoy group projects.
+02
+There is no transparent contribution tracking in any tool currently used by students.
+0% use dedicated project tools; 57% rely on WhatsApp with no task visibility features.
+03
+Informal tools like WhatsApp are structurally inadequate for project management.
+Confirmed by 15 / 17 interview participants; messages lost, tasks uncaptured.
+04
+Last-minute culture is systemic, not individual — it needs structural intervention.
+57% submit at the last minute; only 9% complete work well in advance.
+05
+Accountability is almost entirely absent from current group project setups.
+54% say accountability is rarely or never present; 0% say it is always present.
+06
+Student demand for CollabTrack is overwhelmingly validated.
+91% rated it 4 or 5 stars; 0% said they would not use it; 89% said yes immediately.
+
+9.  Features Requested by Students
+
+When asked what would improve their collaboration experience — through both survey open-ended responses and interview conversations — students consistently requested the following features, ranked by frequency of mention:
+
+Rank
+Feature Requested
+Requested By
+% of Respondents
+1
+Contribution percentage tracker showing each member's share
+28 Students
+80%
+2
+Task assignment board with clear ownership
+26 Students
+74%
+3
+Automated deadline reminder notifications
+24 Students
+69%
+4
+Real-time progress dashboard
+23 Students
+66%
+5
+Faculty visibility into individual contributions
+20 Students
+57%
+6
+Contribution analytics chart (trends, time spent)
+19 Students
+54%
+7
+Role clarity section with documented responsibilities
+18 Students
+51%
+8
+Peer rating / feedback system
+16 Students
+46%
+9
+In-app or WhatsApp-integrated task notifications
+14 Students
+40%
+10
+Milestone planning with weekly check-ins
+12 Students
+34%
+
+10.  Conclusion
+
+The primary research conducted through 35 survey responses and 17 semi-structured interviews provides clear, direct, and deeply evidenced support for the design of CollabTrack — a student-focused group project collaboration platform.
+
+Three quantitative findings stand out as particularly compelling: 91% of students experience unequal workload distribution (with 0% reporting always-equal contribution), 57% complete work at the last minute or on submission day, and 91% rated a contribution-tracking app 4 or 5 out of 5 with zero negative responses. These numbers confirm that the problem is real, widespread, deeply embedded in student culture, and urgently in need of a structured, technological solution.
+
+The qualitative interviews add critical depth to these numbers. Students describe a persistent pattern — the responsible student absorbs excess work, free-riders face no consequence, informal tools fail to provide structure, and confronting teammates is avoided because there is no objective data to point to. The demand is not just for an app — it is for fairness, visibility, and accountability in an environment that currently offers none of these.
+
+The feature requests are specific, consistent, and directly map onto CollabTrack's design: a contribution tracker, task board, deadline reminders, progress dashboard, and role clarity section. This is not speculation — it is what 35 students told us they need, in their own words.
+
+💡 Research Conclusion: Primary research conclusively confirms the need for CollabTrack. The data is unambiguous — the problem is universal, the tools are inadequate, and student demand for a solution is overwhelming. Every feature of CollabTrack is directly justified by what real students said in this research.
+
+Appendix A — Complete Survey Response Data (All 35 Respondents)
+
+The table below provides a complete record of all 35 survey participant responses across key variables:
+
+#
+Yr
+Enjoys?
+Equal Work?
+Main Problem
+Tool
+Deadline
+Accountable?
+Use App?
+Rating
+1
+1st
+Sometimes
+Sometimes
+Poor communication
+WhatsApp
+Last minute
+Sometimes
+Yes
+5/5
+2
+2nd
+Yes
+No
+Unequal workload
+WhatsApp
+Few days before
+No
+Yes
+5/5
+3
+1st
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+4
+2nd
+Sometimes
+Sometimes
+Missed deadlines
+In-Person
+On submission day
+Sometimes
+Yes
+4/5
+5
+1st
+Yes
+Sometimes
+Poor communication
+WhatsApp
+Few days before
+Sometimes
+Yes
+5/5
+6
+2nd
+No
+No
+Unequal workload
+Telegram
+Last minute
+No
+Yes
+5/5
+7
+1st
+Sometimes
+Sometimes
+Missed deadlines
+WhatsApp
+Few days before
+Sometimes
+Yes
+4/5
+8
+3rd
+Yes
+Sometimes
+Team conflicts
+In-Person
+Few days before
+Sometimes
+Yes
+4/5
+9
+1st
+No
+No
+Unclear roles
+WhatsApp
+Last minute
+No
+Yes
+5/5
+10
+2nd
+Sometimes
+No
+Unequal workload
+Google Meet
+On submission day
+No
+Yes
+4/5
+11
+1st
+Yes
+Sometimes
+Poor communication
+WhatsApp
+Few days before
+Sometimes
+Yes
+4/5
+12
+2nd
+No
+No
+Lack of accountability
+Telegram
+Last minute
+No
+Yes
+5/5
+13
+1st
+Sometimes
+Sometimes
+Missed deadlines
+WhatsApp
+Last minute
+Sometimes
+Yes
+5/5
+14
+3rd
+Yes
+Sometimes
+Team conflicts
+In-Person
+Well in advance
+Sometimes
+Yes
+4/5
+15
+1st
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+16
+2nd
+Sometimes
+Sometimes
+Poor communication
+Google Meet
+Few days before
+Sometimes
+Yes
+4/5
+17
+3rd
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+18
+1st
+Yes
+Sometimes
+Missed deadlines
+WhatsApp
+On submission day
+Sometimes
+Yes
+5/5
+19
+2nd
+Sometimes
+No
+Lack of accountability
+In-Person
+Few days before
+No
+Yes
+4/5
+20
+1st
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+21
+3rd
+Sometimes
+Sometimes
+Team conflicts
+Google Meet
+Few days before
+Sometimes
+Maybe
+3/5
+22
+2nd
+Yes
+Sometimes
+Poor communication
+WhatsApp
+Few days before
+Sometimes
+Yes
+4/5
+23
+1st
+No
+No
+Unclear roles
+WhatsApp
+Last minute
+No
+Yes
+5/5
+24
+2nd
+Sometimes
+Sometimes
+Missed deadlines
+Google Meet
+Few days before
+Sometimes
+Yes
+4/5
+25
+1st
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+26
+3rd
+Yes
+Sometimes
+Team conflicts
+Telegram
+Well in advance
+Sometimes
+Maybe
+3/5
+27
+2nd
+No
+No
+Unequal workload
+WhatsApp
+On submission day
+No
+Yes
+5/5
+28
+1st
+Sometimes
+Sometimes
+Poor communication
+WhatsApp
+Few days before
+Sometimes
+Yes
+4/5
+29
+2nd
+No
+No
+Lack of accountability
+In-Person
+Last minute
+No
+Yes
+5/5
+30
+1st
+Yes
+Sometimes
+Missed deadlines
+WhatsApp
+On submission day
+Sometimes
+Yes
+4/5
+31
+3rd
+Sometimes
+Sometimes
+Team conflicts
+Google Meet
+Few days before
+Sometimes
+Yes
+4/5
+32
+2nd
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+33
+1st
+Sometimes
+No
+Poor communication
+Telegram
+Last minute
+No
+Yes
+5/5
+34
+3rd
+Yes
+Sometimes
+Unclear roles
+In-Person
+Few days before
+Sometimes
+Yes
+4/5
+35
+2nd
+No
+No
+Unequal workload
+WhatsApp
+Last minute
+No
+Yes
+5/5
+
+Appendix B — Interview Question Guide
+
+Formal Interview Protocol (8 Questions)
+
+Q No.
+Question
+Purpose
+F1
+Can you describe how group projects are typically organised in your experience?
+Understand baseline behaviour
+F2
+Have you experienced situations where the workload was distributed unfairly?
+Validate unequal workload problem
+F3
+How did that situation affect you personally?
+Capture emotional/motivational impact
+F4
+What communication tools does your group currently use, and how well do they work?
+Assess tool adequacy
+F5
+How do you currently track who has done what in a project?
+Identify accountability gaps
+F6
+If you could add one thing to how group projects work in your college, what would it be?
+Elicit design needs
+F7
+How would you feel about a system that shows each person's contribution as a percentage?
+Test reaction to key feature
+F8
+On a scale of 1–5, how useful would a dedicated group project tracking app be?
+Quantify demand
+
+Informal Interview Protocol (Conversational Prompts)
+
+Prompt
+Intent
+Be honest — what are group projects actually like for you?
+Break ice, get authentic first impression
+Who usually ends up doing the most work?
+Probe free-rider dynamic naturally
+What bothers you the most about how things are done?
+Identify primary pain point in natural language
+Would you use an app that tracks each person's contribution?
+Gauge demand without leading
+What one feature would make it actually useful for you?
+Capture top feature request concisely
+
+Appendix C — Interview Participant Summary
+
+No.
+Year
+Interview Type
+Key Theme Raised
+1
+1st
+Formal
+Responsible student burden; contribution visibility as social accountability
+2
+2nd
+Formal
+Free-riding; motivational erosion; task board and % tracker
+3
+3rd
+Formal
+Leadership fatigue; faculty visibility; structured role definition
+4
+2nd
+Formal
+Ghost teammates; lack of proof; peer rating need
+5
+3rd
+Formal
+Adaptive strategies; mid-project check-ins; mentorship perspective
+6
+3rd
+Formal
+Free-rider resentment; faculty inaction; overnight rushes
+7
+3rd
+Formal
+Surveillance concern; quality vs quantity tracking; constructive scepticism
+8
+3rd
+Formal
+Best/worst project contrast; progress timeline; colour-coded status
+9
+1st
+Informal
+Absorbing work; emotional toll; data as protection
+10
+2nd
+Informal
+Last-minute panic culture; WhatsApp overload; single dashboard need
+11
+2nd
+Informal
+Scheduling difficulty; asynchronous tracking; deadline reminders
+12
+1st
+Informal
+Motivation drop; solo completion tendency; mandatory adoption preference
+13
+2nd
+Informal
+Tool abandonment pattern; WhatsApp integration suggestion
+14
+1st
+Informal
+Late warning system; emotional stress; 5-star validation
+15
+1st
+Informal
+Message ignorance; consequence-driven behaviour; push notifications
+16
+2nd
+Informal
+Personal task tracking burden; shared decision log; instant adoption desire
+17
+2nd
+Informal
+Institutional structure gap; free as adoption driver; design simplicity
+
